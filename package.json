@@ -1,0 +1,40 @@
+{
+	"name": "json-stream-es",
+	"description": "A streaming JSON parser/stringifier using web streams.",
+	"tags": [
+		"json",
+		"stream",
+		"webstreams"
+	],
+	"version": "1.0.0",
+	"author": "Candid Dauth <cdauth@cdauth.eu>",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/cdauth/json-stream-es"
+	},
+	"type": "module",
+	"devDependencies": {
+		"@types/node": "^20.12.8",
+		"typescript": "^5.4.5",
+		"vite": "^5.2.11",
+		"vite-node": "^1.5.3",
+		"vite-plugin-dts": "^3.9.0",
+		"vitest": "^1.5.3"
+	},
+	"scripts": {
+		"build": "vite build",
+		"test": "vitest run",
+		"test-watch": "vitest",
+		"check-types": "tsc -b tsconfig.node.json --emitDeclarationOnly"
+	},
+	"bugs": "https://github.com/cdauth/jsonparse-es/issues",
+	"license": "MIT",
+	"main": "./dist/jsonparse-es.mjs",
+	"types": "./dist/jsonparse-es.d.ts",
+	"files": [
+		"dist",
+		"src",
+		"README.md",
+		"LICENSE"
+	]
+}
