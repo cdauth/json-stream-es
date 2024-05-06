@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { concatStreams, iteratorToStream, streamToArray, stringToStream } from "../utils";
+import { concatStreams, iterableToStream, streamToArray, stringToStream } from "../utils";
 import { ValueAggregator } from "../json-deserializer";
-import JsonParser from "../json-parser";
+import { JsonParser } from "../json-parser";
 
 test("JsonDeserializer", async () => {
 	const values = [

@@ -135,7 +135,7 @@ const BOOLEAN_OR_NULL_CHARS = [...new Set(Object.keys(BOOLEAN_OR_NULL).flatMap((
  * The JSON string must contain only one JSON value (object/array/string/number/boolean/null) on the root level, otherwise
  * the stream will fail with an error.
  */
-export default class JsonParser extends AbstractTransformStream<string, JsonChunk> {
+export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 	protected state: State = { type: StateType.START };
 	protected lengthBeforeCurrentChunk = 0;
 

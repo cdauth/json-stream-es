@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { streamToArray, stringToStream } from "../utils";
-import JsonParser from "../json-parser";
-import PathEnricher from "../path-enricher";
+import { JsonParser } from "../json-parser";
+import { PathEnricher } from "../path-enricher";
 import { StringRole, arrayEnd, arrayStart, colon, comma, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart } from "../types";
 
 test("PathEnricherStream", async () => {

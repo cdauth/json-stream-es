@@ -10,17 +10,17 @@ enum StateType {
 type AnyState = (
 	{
 		type: StateType.ROOT;
-		value: JsonValue;
+		value: JsonValue | undefined;
 	} | {
 		type: StateType.OBJECT_PROPERTY;
 		object: Record<string, JsonValue>;
 		key: string;
-		value: JsonValue;
+		value: JsonValue | undefined;
 		parent: State;
 	} | {
 		type: StateType.ARRAY_ITEM;
 		array: Array<JsonValue>;
-		value: JsonValue;
+		value: JsonValue | undefined;
 		parent: State;
 	}
 );
@@ -39,11 +39,15 @@ export class ValueAggregator extends AbstractTransformStream<JsonChunk, JsonValu
 			controller.enqueue(this.state.value);
 			this.state.value = undefined;
 		} else if (this.state.type === StateType.OBJECT_PROPERTY) {
-			this.state.object[this.state.key] = this.state.value;
+			if (this.state.value !== undefined) {
+				this.state.object[this.state.key] = this.state.value;
+			}
 			this.state.key = "";
 			this.state.value = undefined;
 		} else if (this.state.type === StateType.ARRAY_ITEM) {
-			this.state.array.push(this.state.value);
+			if (this.state.value !== undefined) {
+				this.state.array.push(this.state.value);
+			}
 			this.state.value = undefined;
 		}
 	}

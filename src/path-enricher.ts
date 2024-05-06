@@ -21,7 +21,7 @@ export type JsonChunkWithPath = JsonChunk & {
  * Adds a "path" property to all JsonChunks passed through it that indicates the path of object property keys
  * and array item indexes where the chunk is located.
  */
-export default class PathEnricher extends AbstractTransformStream<JsonChunk, JsonChunkWithPath> {
+export class PathEnricher extends AbstractTransformStream<JsonChunk, JsonChunkWithPath> {
 	protected stack: Array<{
 		type: "object";
 		/** pending: still receiving key STRING_CHUNKs; next: next chunk will transition state to active; active: path applies to all current chunks */

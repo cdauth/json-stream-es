@@ -2,10 +2,10 @@ import { expect, test } from "vitest";
 import { readFile } from "fs/promises";
 import { createReadStream } from "fs";
 import { Readable } from "stream";
-import JsonParser from "../json-parser";
+import { JsonParser } from "../json-parser";
 import type { ReadableStream as NodeReadableStream } from "stream/web";
 import { JsonChunkType, StringRole, colon, comma, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace, type JsonChunk } from "../types";
-import JsonStringifier from "../json-stringifier";
+import { JsonStringifier } from "../json-stringifier";
 import { streamToArray } from "../utils";
 
 test("JsonParseStream–JsonStringifyStream round trip", async () => {

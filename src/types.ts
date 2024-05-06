@@ -1,7 +1,5 @@
 /** A JavaScript value that can be stringified to JSON. */
-// This would be the right type, but that doesn't work because of circular references.
-// export type JsonValue = Record<string, JsonValue> | Array<JsonValue> | string | number | boolean | null;
-export type JsonValue = any;
+export type JsonValue = { [key: string]: JsonValue } | Array<JsonValue> | string | number | boolean | null;
 
 export enum JsonChunkType {
 	/** A whitespace that appears between JSON tokens and has no semantic meaning. */

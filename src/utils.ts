@@ -1,4 +1,4 @@
-export async function* streamToIterator<T>(stream: ReadableStream<T>): AsyncIterable<T> {
+export async function* streamToIterable<T>(stream: ReadableStream<T>): AsyncIterable<T> {
 	const reader = stream.getReader();
 
 	while (true) {
@@ -11,11 +11,11 @@ export async function* streamToIterator<T>(stream: ReadableStream<T>): AsyncIter
 	}
 }
 
-export function iteratorToSource<T>(iterator: AsyncIterable<T> | Iterable<T>): UnderlyingDefaultSource<T> {
-	const it = Symbol.asyncIterator in iterator ? iterator[Symbol.asyncIterator]() : iterator[Symbol.iterator]();
+export function iterableToSource<T>(iterable: AsyncIterable<T> | Iterable<T>): UnderlyingDefaultSource<T> {
+	const iterator = Symbol.asyncIterator in iterable ? iterable[Symbol.asyncIterator]() : iterable[Symbol.iterator]();
 	return {
 		async pull(controller) {
-			const { value, done } = await it.next();
+			const { value, done } = await iterator.next();
 			if (done) {
 				controller.close();
 			} else {
@@ -25,8 +25,8 @@ export function iteratorToSource<T>(iterator: AsyncIterable<T> | Iterable<T>): U
 	};
 }
 
-export function iteratorToStream<T>(iterator: AsyncIterable<T> | Iterable<T>, strategy?: QueuingStrategy<T>): ReadableStream<T> {
-	return new ReadableStream<T>(iteratorToSource(iterator), strategy);
+export function iterableToStream<T>(iterable: AsyncIterable<T> | Iterable<T>, strategy?: QueuingStrategy<T>): ReadableStream<T> {
+	return new ReadableStream<T>(iterableToSource(iterable), strategy);
 }
 
 export async function streamToArray<T>(stream: ReadableStream<T>): Promise<T[]> {
@@ -48,7 +48,7 @@ export async function streamToString(stream: ReadableStream<string>): Promise<st
 }
 
 export function stringToStream(string: string): ReadableStream<string> {
-	return iteratorToStream([string]);
+	return iterableToStream([string]);
 }
 
 export function concatStreams<T>(...streams: Array<ReadableStream<T> | (() => ReadableStream<T>)>): ReadableStream<T> {
