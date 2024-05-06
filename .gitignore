@@ -2,3 +2,4 @@ node_modules
 out
 out.node
 dist
+vite.config.ts.timestamp-*.mjs

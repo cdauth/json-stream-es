@@ -1,4 +1,4 @@
-import { StringRole, arrayEnd, arrayStart, booleanValue, colon, comma, nullValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart, type JsonChunk, type JsonValue } from "./types";
+import { StringRole, arrayEnd, arrayStart, booleanValue, colon, comma, nullValue, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace, type JsonChunk, type JsonValue } from "./types";
 import { iterableToSource, iterableToStream, streamToIterable } from "./utils";
 
 type AnyIterable<T> = Iterable<T> | AsyncIterable<T> | ReadableStream<T>;
@@ -51,13 +51,26 @@ export type SerializableJsonValue = SyncOrAsync<
 	| undefined
 >;
 
-async function* serializeJson(value: SerializableJsonValue): AsyncIterable<JsonChunk> {
+function normalizeSpace(space: string | number | undefined): string {
+	if (typeof space === "number") {
+		return " ".repeat(space);
+	} else if (typeof space === "string") {
+		return space;
+	} else {
+		return "";
+	}
+}
+
+async function* serializeJson(value: SerializableJsonValue, space?: string | number, spacePrefix = ""): AsyncIterable<JsonChunk> {
+	const normalizedSpace = normalizeSpace(space);
 	const val = await (typeof value === "function" ? value() : value);
 
 	if (val == null) {
 		yield nullValue();
 	} else if (typeof val === "boolean") {
 		yield booleanValue(val);
+	} else if (typeof val === "number") {
+		yield numberValue(val);
 	} else if (typeof val === "string" || isStringStream(val)) {
 		yield stringStart();
 		for await (const chunk of isStringStream(val) ? streamToIterable(val) : [val]) {
@@ -75,9 +88,17 @@ async function* serializeJson(value: SerializableJsonValue): AsyncIterable<JsonC
 				yield comma();
 			}
 
-			for await (const chunk of serializeJson(v)) {
+			if (normalizedSpace) {
+				yield whitespace(`\n${spacePrefix}${normalizedSpace}`);
+			}
+
+			for await (const chunk of serializeJson(v, space, `${spacePrefix}${normalizedSpace}`)) {
 				yield chunk;
 			}
+		}
+
+		if (!first && normalizedSpace) {
+			yield whitespace(`\n${spacePrefix}`);
 		}
 
 		yield arrayEnd();
@@ -97,6 +118,10 @@ async function* serializeJson(value: SerializableJsonValue): AsyncIterable<JsonC
 				yield comma();
 			}
 
+			if (normalizedSpace) {
+				yield whitespace(`\n${spacePrefix}${normalizedSpace}`);
+			}
+
 			yield stringStart(StringRole.KEY);
 			for await (const chunk of isStringStream(k) ? streamToIterable(k) : [k]) {
 				yield stringChunk(chunk, StringRole.KEY);
@@ -104,9 +129,17 @@ async function* serializeJson(value: SerializableJsonValue): AsyncIterable<JsonC
 			yield stringEnd(StringRole.KEY);
 			yield colon();
 
-			for await (const chunk of serializeJson(v)) {
+			if (normalizedSpace) {
+				yield whitespace(" ");
+			}
+
+			for await (const chunk of serializeJson(v, space, `${spacePrefix}${normalizedSpace}`)) {
 				yield chunk;
 			}
+		}
+
+		if (!first && normalizedSpace) {
+			yield whitespace(`\n${spacePrefix}`);
 		}
 
 		yield objectEnd();
@@ -116,8 +149,8 @@ async function* serializeJson(value: SerializableJsonValue): AsyncIterable<JsonC
 /**
  * Converts any JSON-stringifiable JavaScript value into a stream of JsonChunks.
  */
-export class JsonSerializer extends ReadableStream<JsonValue> {
-	constructor(value: SerializableJsonValue, strategy?: QueuingStrategy<JsonValue>) {
-		super(iterableToSource(serializeJson(value)), strategy);
+export class JsonSerializer extends ReadableStream<JsonChunk> {
+	constructor(value: SerializableJsonValue, space?: string | number, strategy?: QueuingStrategy<JsonChunk>) {
+		super(iterableToSource(serializeJson(value, space)), strategy);
 	}
 }

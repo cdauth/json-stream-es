@@ -1,11 +1,13 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { streamToArray, stringToStream } from "../utils";
 import { JsonParser } from "../json-parser";
-import { PathEnricher } from "../path-enricher";
+import { PathSelector, type PathSelectorExpression } from "../path-selector";
 import { StringRole, arrayEnd, arrayStart, colon, comma, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart } from "../types";
+import { JsonSerializer } from "../json-serializer";
+import { JsonDeserializer } from "../json-deserializer";
 
-test("PathEnricherStream", async () => {
-	const stream = stringToStream(JSON.stringify({
+test("PathSelectorStream adds path", async () => {
+	const stream = new JsonSerializer({
 		object: {
 			array: [
 				"item1",
@@ -13,7 +15,7 @@ test("PathEnricherStream", async () => {
 				{ key: "item3" }
 			]
 		}
-	})).pipeThrough(new JsonParser()).pipeThrough(new PathEnricher());
+	}).pipeThrough(new PathSelector([]));
 
 	expect(await streamToArray(stream)).toEqual([
 		{ ...objectStart(), path: [] },
@@ -45,5 +47,49 @@ test("PathEnricherStream", async () => {
 		{ ...arrayEnd(), path: ["object", "array"] },
 		{ ...objectEnd(), path: ["object"] },
 		{ ...objectEnd(), path: [] }
+	]);
+});
+
+test("PathSelectorStream selects path", async () => {
+	const json = {
+		object: {
+			array: [
+				"item1",
+				2,
+				{ key: "item3" }
+			]
+		}
+	};
+
+	const select = async (selector: PathSelectorExpression) => await streamToArray(new JsonSerializer(json).pipeThrough(new PathSelector(selector)).pipeThrough(new JsonDeserializer()));
+
+	expect(await select([])).toEqual([
+		{ value: json, path: [] }
+	]);
+
+	expect(await select(["object"])).toEqual([
+		{ value: json.object, path: ["object"] }
+	]);
+
+	expect(await select(["object", "array"])).toEqual([
+		{ value: json.object.array, path: ["object", "array"] }
+	]);
+
+	expect(await select(["object", undefined])).toEqual([
+		{ value: json.object.array, path: ["object", "array"] }
+	]);
+
+	expect(await select((path) => path.length === 2 && path[0] === "object" && path[1] === "array")).toEqual([
+		{ value: json.object.array, path: ["object", "array"] }
+	]);
+
+	expect(await select(["object", "array", 1])).toEqual([
+		{ value: json.object.array[1], path: ["object", "array", 1] }
+	]);
+
+	expect(await select(["object", "array", undefined])).toEqual([
+		{ value: json.object.array[0], path: ["object", "array", 0] },
+		{ value: json.object.array[1], path: ["object", "array", 1] },
+		{ value: json.object.array[2], path: ["object", "array", 2] }
 	]);
 });

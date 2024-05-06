@@ -3,7 +3,11 @@ import { JsonSerializer, arrayStream, objectStream, stringStream } from "../json
 import { JsonStringifier } from "../json-stringifier";
 import { streamToString } from "../utils";
 
-test('JsonSerializer', async () => {
+test.each([
+	{ space: undefined, desc: "undefined" },
+	{ space: "\t", desc: "tab" },
+	{ space: 4, desc: "4" },
+])("JsonSerializer ($desc space)", async ({ space }) => {
 	const stream = new JsonSerializer({
 		test1: { test: 'object' },
 		test2: {
@@ -28,7 +32,7 @@ test('JsonSerializer', async () => {
 		test9: undefined,
 		test10: () => Promise.resolve(undefined),
 		test11: "string"
-	});
+	}, space);
 
 	expect(await streamToString(stream.pipeThrough(new JsonStringifier()))).toBe(JSON.stringify({
 		test1: {
@@ -54,5 +58,5 @@ test('JsonSerializer', async () => {
 		test7: "promise",
 		test8: "promise",
 		test11: "string"
-	}));
+	}, undefined, space));
 });

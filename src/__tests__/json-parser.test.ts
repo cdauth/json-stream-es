@@ -1,26 +1,7 @@
 import { expect, test } from "vitest";
-import { readFile } from "fs/promises";
-import { createReadStream } from "fs";
-import { Readable } from "stream";
 import { JsonParser } from "../json-parser";
-import type { ReadableStream as NodeReadableStream } from "stream/web";
-import { JsonChunkType, StringRole, colon, comma, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace, type JsonChunk } from "../types";
-import { JsonStringifier } from "../json-stringifier";
+import { JsonChunkType, StringRole, colon, comma, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace } from "../types";
 import { streamToArray } from "../utils";
-
-test("JsonParseStream–JsonStringifyStream round trip", async () => {
-	const jsonFileStream = Readable.toWeb(createReadStream(new URL("./basic.json", import.meta.url), "utf8")) as ReadableStream<string>;
-	const parseStream = jsonFileStream.pipeThrough(new JsonParser());
-	const stringifyStream = parseStream.pipeThrough(new JsonStringifier());
-
-	let result = "";
-	for await (const chunk of stringifyStream as NodeReadableStream<JsonChunk>) {
-		result += chunk;
-	}
-
-	const jsonFile = await readFile(new URL("./basic.json", import.meta.url), "utf8");
-	expect(result).toEqual(jsonFile);
-});
 
 test("empty object", async () => {
 	const transform = new TransformStream<string, string>();

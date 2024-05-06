@@ -11,8 +11,8 @@ export default defineConfig({
 		target: "esnext",
 		lib: {
 			entry: './src/index.ts',
-			name: 'jsonparse-es',
-			fileName: () => 'jsonparse-es.mjs',
+			name: 'json-stream-es',
+			fileName: () => 'json-stream-es.mjs',
 			formats: ['es']
 		},
 		rollupOptions: {

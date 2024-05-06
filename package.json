@@ -18,6 +18,7 @@
 	},
 	"devDependencies": {
 		"@types/node": "^20.12.8",
+		"rimraf": "^5.0.5",
 		"typescript": "^5.4.5",
 		"vite": "^5.2.11",
 		"vite-node": "^1.5.3",
@@ -26,14 +27,15 @@
 	},
 	"scripts": {
 		"build": "vite build",
+		"clean": "rimraf dist out out.node",
 		"test": "vitest run",
 		"test-watch": "vitest",
 		"check-types": "tsc -b tsconfig.node.json --emitDeclarationOnly"
 	},
-	"bugs": "https://github.com/cdauth/jsonparse-es/issues",
-	"license": "MIT",
-	"main": "./dist/jsonparse-es.mjs",
-	"types": "./dist/jsonparse-es.d.ts",
+	"bugs": "https://github.com/cdauth/json-stream-es/issues",
+	"license": "BSD-2-Clause",
+	"main": "./dist/json-stream-es.mjs",
+	"types": "./dist/json-stream-es.d.ts",
 	"files": [
 		"dist",
 		"src",
