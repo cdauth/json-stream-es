@@ -1,4 +1,5 @@
-import { ArrayEnd, ArrayStart, BooleanValue, Colon, Comma, JsonChunk, NullValue, NumberValue, ObjectEnd, ObjectStart, StringChunk, StringEnd, StringStart, Whitespace } from "./types";
+import { StringRole, arrayEnd, arrayStart, booleanValue, colon, comma, nullValue, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace, type JsonChunk } from "./types";
+import { AbstractTransformStream } from "./utils";
 
 enum StateType {
 	START = "start",
@@ -14,8 +15,8 @@ enum StateType {
 
 /** States where the start of a new value (object/array/string/number/boolean/null) is allowed. */
 const VALUE_START_ALLOWED = [StateType.START, StateType.OBJECT_AFTER_COLON, StateType.ARRAY_AFTER_START, StateType.ARRAY_AFTER_COMMA] as const;
-/** States where the start of a new string value is allowed. */
-const STRING_START_ALLOWED = [...VALUE_START_ALLOWED, StateType.OBJECT_AFTER_START, StateType.OBJECT_AFTER_COMMA] as const;
+/** States whree the start of an object key string is allowed. */
+const KEY_START_ALLOWED = [StateType.OBJECT_AFTER_START, StateType.OBJECT_AFTER_COMMA] as const;
 /** States where a whilespace character is allowed. */
 const WHITESPACE_ALLOWED = [
 	StateType.START, StateType.OBJECT_AFTER_START, StateType.OBJECT_AFTER_KEY, StateType.OBJECT_AFTER_COLON, StateType.OBJECT_AFTER_VALUE, StateType.OBJECT_AFTER_COMMA,
@@ -50,7 +51,8 @@ type AnyState = {
 	type: StateType.STRING;
 	value: string;
 	rawValue: string;
-	parentState: State<typeof STRING_START_ALLOWED[number]>;
+	role: StringRole;
+	parentState: State<typeof VALUE_START_ALLOWED[number] | typeof KEY_START_ALLOWED[number]>;
 } | {
 	type: StateType.STRING_AFTER_BACKSLASH;
 	rawValue: string;
@@ -74,7 +76,7 @@ function isState<T extends StateType>(state: State, types: readonly [...T[]]): s
  * Given the state when a value (object/array/string/number/boolean/null) was started, returns the
  * new state after the value was finished.
  */
-function getStateAfterValue(stateBeforeValue: State<typeof STRING_START_ALLOWED[number]>): State {
+function getStateAfterValue(stateBeforeValue: State<typeof VALUE_START_ALLOWED[number] | typeof KEY_START_ALLOWED[number]>): State {
 	if (stateBeforeValue.type === StateType.START) {
 		return { ...stateBeforeValue, type: StateType.END };
 	} else if (stateBeforeValue.type === StateType.OBJECT_AFTER_COLON) {
@@ -128,19 +130,37 @@ const BOOLEAN_OR_NULL = { false: false, true: true, null: null };
 const BOOLEAN_OR_NULL_FIRST_CHARS = Object.keys(BOOLEAN_OR_NULL).map((k) => k[0]);
 const BOOLEAN_OR_NULL_CHARS = [...new Set(Object.keys(BOOLEAN_OR_NULL).flatMap((k) => [...k]))];
 
-export default class JsonParseStream extends TransformStream<string, JsonChunk> {
+/**
+ * Parses a JSON string stream into a stream of JsonChunks.
+ * The JSON string must contain only one JSON value (object/array/string/number/boolean/null) on the root level, otherwise
+ * the stream will fail with an error.
+ */
+export default class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 	protected state: State = { type: StateType.START };
 	protected lengthBeforeCurrentChunk = 0;
 
-	constructor(writableStrategy?: QueuingStrategy<string>, readableStrategy?: QueuingStrategy<JsonChunk>) {
-		super({
-			transform: (chunk, controller) => {
-				this.transform(chunk, controller);
-			},
-			flush: (controller) => {
-				this.flush(controller);
+	/**
+	 * Checks whether a token that doesn't have an explicit end character (that is: numbers and whitespaces) has ended, and if
+	 * so, update the state and emit the appropriate chunks.
+	 * @param char The next character on the stream. Is used to check whether the current token ends (for example, a number is ended
+	 *     by a non-number character). If undefined, the stream is assumed to have ended, so the current token must always end.
+	 */
+	protected checkValueEnd(controller: TransformStreamDefaultController<JsonChunk>, char: string | undefined) {
+		if (this.state.type === StateType.WHITESPACE && (char == null || !WHITESPACE_CHARS.includes(char))) {
+			if (this.state.rawValue.length > 0) {
+				controller.enqueue(whitespace(this.state.rawValue));
 			}
-		}, writableStrategy, readableStrategy);
+			this.state = this.state.parentState;
+		}
+
+		if (
+			(this.state.type === StateType.NUMBER_DIGITS && (char == null || ![...NUMBER_CHARS, ".", "e", "E"].includes(char)))
+			|| (this.state.type === StateType.NUMBER_DECIMAL_DIGITS && (char == null || ![...NUMBER_CHARS, "e", "E"].includes(char)))
+			|| (this.state.type === StateType.NUMBER_E_DIGITS && (char == null || !NUMBER_CHARS.includes(char)))
+		) {
+			controller.enqueue(numberValue(Number(this.state.rawValue), this.state.rawValue));
+			this.state = getStateAfterValue(this.state.parentState);
+		}
 	}
 
 	/**
@@ -150,30 +170,13 @@ export default class JsonParseStream extends TransformStream<string, JsonChunk> 
 		const char = context.char;
 
 		// End chunks that don't have an explicit end char
-
-		if (this.state.type === StateType.WHITESPACE && !WHITESPACE_CHARS.includes(char)) {
-			if (this.state.rawValue.length > 0) {
-				controller.enqueue(new Whitespace(this.state.rawValue));
-			}
-			this.state = this.state.parentState;
-			// No return, char still needs to be processed
-		}
-
-		if (
-			(this.state.type === StateType.NUMBER_DIGITS && ![...NUMBER_CHARS, ".", "e", "E"].includes(char))
-			|| (this.state.type === StateType.NUMBER_DECIMAL_DIGITS && ![...NUMBER_CHARS, "e", "E"].includes(char))
-			|| (this.state.type === StateType.NUMBER_E_DIGITS && !NUMBER_CHARS.includes(char))
-		) {
-			controller.enqueue(new NumberValue(Number(this.state.rawValue), this.state.rawValue));
-			this.state = getStateAfterValue(this.state.parentState);
-			// No return, char still needs to be processed
-		}
+		this.checkValueEnd(controller, char);
 
 
 		// Objects
 
 		if (char === "{" && isState(this.state, VALUE_START_ALLOWED)) {
-			controller.enqueue(new ObjectStart(char));
+			controller.enqueue(objectStart(char));
 			this.state = {
 				type: StateType.OBJECT_AFTER_START,
 				parentState: this.state
@@ -182,13 +185,13 @@ export default class JsonParseStream extends TransformStream<string, JsonChunk> 
 		}
 
 		if (char === "}" && isState(this.state, [StateType.OBJECT_AFTER_START, StateType.OBJECT_AFTER_VALUE])) {
-			controller.enqueue(new ObjectEnd(char));
+			controller.enqueue(objectEnd(char));
 			this.state = getStateAfterValue(this.state.parentState);
 			return;
 		}
 
 		if (char === ":" && isState(this.state, [StateType.OBJECT_AFTER_KEY])) {
-			controller.enqueue(new Colon(char));
+			controller.enqueue(colon(char));
 			this.state = {
 				type: StateType.OBJECT_AFTER_COLON,
 				parentState: this.state.parentState
@@ -197,7 +200,7 @@ export default class JsonParseStream extends TransformStream<string, JsonChunk> 
 		}
 
 		if (char === "," && isState(this.state, [StateType.OBJECT_AFTER_VALUE])) {
-			controller.enqueue(new Comma(char));
+			controller.enqueue(comma(char));
 			this.state = {
 				type: StateType.OBJECT_AFTER_COMMA,
 				parentState: this.state.parentState
@@ -209,7 +212,7 @@ export default class JsonParseStream extends TransformStream<string, JsonChunk> 
 		// Arrays
 
 		if (char === "[" && isState(this.state, VALUE_START_ALLOWED)) {
-			controller.enqueue(new ArrayStart(char));
+			controller.enqueue(arrayStart(char));
 			this.state = {
 				type: StateType.ARRAY_AFTER_START,
 				parentState: this.state
@@ -218,13 +221,13 @@ export default class JsonParseStream extends TransformStream<string, JsonChunk> 
 		}
 
 		if (char === "]" && isState(this.state, [StateType.ARRAY_AFTER_START, StateType.ARRAY_AFTER_VALUE])) {
-			controller.enqueue(new ArrayEnd(char));
+			controller.enqueue(arrayEnd(char));
 			this.state = getStateAfterValue(this.state.parentState);
 			return;
 		}
 
 		if (char === "," && isState(this.state, [StateType.ARRAY_AFTER_VALUE])) {
-			controller.enqueue(new Comma(char));
+			controller.enqueue(comma(char));
 			this.state = {
 				type: StateType.ARRAY_AFTER_COMMA,
 				parentState: this.state.parentState
@@ -249,9 +252,9 @@ export default class JsonParseStream extends TransformStream<string, JsonChunk> 
 			for (const [key, value] of Object.entries(BOOLEAN_OR_NULL)) {
 				if (rawValue === key) {
 					if (typeof value === "boolean") {
-						controller.enqueue(new BooleanValue(value, rawValue));
+						controller.enqueue(booleanValue(value, rawValue));
 					} else {
-						controller.enqueue(new NullValue(rawValue));
+						controller.enqueue(nullValue(rawValue));
 					}
 
 					this.state = getStateAfterValue(this.state.parentState);
@@ -269,12 +272,25 @@ export default class JsonParseStream extends TransformStream<string, JsonChunk> 
 		// Strings
 
 		if (char === "\"") {
-			if (isState(this.state, STRING_START_ALLOWED)) {
-				controller.enqueue(new StringStart(char));
+			if (isState(this.state, VALUE_START_ALLOWED)) {
+				controller.enqueue(stringStart(StringRole.VALUE, char));
 				this.state = {
 					type: StateType.STRING,
 					value: "",
 					rawValue: "",
+					role: StringRole.VALUE,
+					parentState: this.state
+				};
+				return;
+			}
+
+			if (isState(this.state, KEY_START_ALLOWED)) {
+				controller.enqueue(stringStart(StringRole.KEY, char));
+				this.state = {
+					type: StateType.STRING,
+					value: "",
+					rawValue: "",
+					role: StringRole.KEY,
 					parentState: this.state
 				};
 				return;
@@ -282,9 +298,10 @@ export default class JsonParseStream extends TransformStream<string, JsonChunk> 
 
 			if (isState(this.state, [StateType.STRING])) {
 				if (this.state.rawValue.length > 0) {
-					controller.enqueue(new StringChunk(this.state.value, this.state.rawValue));
+					controller.enqueue(stringChunk(this.state.value, this.state.role, this.state.rawValue));
 				}
-				controller.enqueue(new StringEnd(char));
+
+				controller.enqueue(stringEnd(this.state.role, char));
 				this.state = getStateAfterValue(this.state.parentState);
 				return;
 			}
@@ -422,15 +439,19 @@ export default class JsonParseStream extends TransformStream<string, JsonChunk> 
 
 		// Whitespaces
 
-		if (WHITESPACE_CHARS.includes(char) && isState(this.state, [...WHITESPACE_ALLOWED, StateType.WHITESPACE])) {
+		if (WHITESPACE_CHARS.includes(char)) {
 			if (this.state.type === StateType.WHITESPACE) {
 				this.state.rawValue += char;
-			} else {
+				return;
+			}
+
+			if (isState(this.state, WHITESPACE_ALLOWED)) {
 				this.state = {
 					type: StateType.WHITESPACE,
 					rawValue: char,
 					parentState: this.state
 				};
+				return;
 			}
 		}
 
@@ -450,13 +471,13 @@ export default class JsonParseStream extends TransformStream<string, JsonChunk> 
 			undefined
 		);
 		if (stringState) {
-			controller.enqueue(new StringChunk(stringState.value, stringState.rawValue));
+			controller.enqueue(stringChunk(stringState.value, stringState.role, stringState.rawValue));
 			stringState.rawValue = "";
 			stringState.value = "";
 		}
 
 		if (this.state.type === StateType.WHITESPACE && this.state.rawValue.length > 0) {
-			controller.enqueue(new Whitespace(this.state.rawValue));
+			controller.enqueue(whitespace(this.state.rawValue));
 			this.state.rawValue = "";
 		}
 	}
@@ -464,7 +485,7 @@ export default class JsonParseStream extends TransformStream<string, JsonChunk> 
 	/**
 	 * Transforms an incoming chunk.
 	 */
-	protected transform(chunk: string, controller: TransformStreamDefaultController<JsonChunk>) {
+	protected override transform(chunk: string, controller: TransformStreamDefaultController<JsonChunk>) {
 		for (let i = 0; i < chunk.length; i++) {
 			this.handleChar(controller, { char: chunk[i], position: this.lengthBeforeCurrentChunk + i });
 		}
@@ -476,9 +497,13 @@ export default class JsonParseStream extends TransformStream<string, JsonChunk> 
 	/**
 	 * Called when the end of the incoming stream is reached. Checks that a complete value has been emitted.
 	 */
-	protected flush(controller: TransformStreamDefaultController<JsonChunk>) {
+	protected override flush(controller: TransformStreamDefaultController<JsonChunk>) {
+		this.checkValueEnd(controller, undefined);
+
 		if (this.state.type !== StateType.END) {
 			throw new PrematureEndError();
 		}
+
+		controller.terminate();
 	}
 }

@@ -1,2 +1,2 @@
-export * from "./parse-stream";
+export * from "./json-parser";
 export * from "./types";

@@ -6,25 +6,49 @@ When implementing a web service in the backend (for example a REST API), streami
 
 When consuming a web service from the frontend, streaming JSON has the advantage that you can display the partial data as it loads, and that memory consumption is reduced if you only intend to consume parts of the retrieved data.
 
-## `JsonChunk` objects
+## Usage
 
-At its core, json-stream-es is a library that provides helpers to convert `ReadableStream<string>` to and from a `ReadableStream<JsonChunk>`. A `JsonChunk` is an internal representation of a section of the JSON document that has a specific semantic meaning; The types of `JsonChunk` are:
+### Generate a JSON stream
 
-| Class name     | Description | Properties |
+### Consume a JSON stream
+
+## Architecture
+
+At its core, json-stream-es handles 3 types of JSON documents:
+* A `ReadableStream<string>` is a streamed stringified JSON document
+* A `ReadableStream<JsonChunk>` is an internal representation of a JSON document, where each [`JsonChunk`](#jsonchunk-objects) represents a section of the document
+* A `JsonValue` is a JavaScript value that can be stringified to JSON (in particular `Record<string, JsonValue> | Array<JsonValue> | string | number | boolean | null`, but represented as `any` in the code base because TypeScript doesn’t allow circular references).
+
+The main featurs of json-stream-es are:
+* Provide converters to convert between the 3 types of JSON documents:
+	* [`JsonParser`](#jsonparser) (`ReadableStream<string>` → `ReadableStream<JsonChunk>`)
+	* [`JsonStringifier`](#jsonstringifier) (`ReadableStream<JsonChunk>` → `ReadableStream<string>`)
+	* [`JsonDeserializer`](#jsondeserializer) (`ReadableStream<JsonChunk>` → `JsonValue`)
+	* [`JsonSerializer`](#jsonserializer) (`JsonValue` → `ReadableStream<JsonChunk>`)
+* Provide helpers to generate, analyze and modify a `ReadableStream<JsonChunk>`:
+	* [`PathEnricher`](#pathenricher) to provide context to values nested in objects/arrays
+	* [`PathFilter`](#pathfilter) to get values nested at a certain context.
+	* [`JsonChunk` creators](#jsonchunk-creators)
+
+### `JsonChunk` objects
+
+A `JsonChunk` is an internal representation of a section of the JSON document that has a specific semantic meaning; The types of `JsonChunk` are:
+
+| Type          | Description | Properties |
 | -------------- | ----------- | ---------- |
-| `Whitespace`   | Whitespace characters without any semantic meaning appearing between JSON tokens. | |
-| `Comma`        | A `,` that separates two array/object items. | |
-| `Colon`        | A `:` that separates an object key from its value. | |
-| `ObjectStart`  | A `{` starting an object. | |
-| `ObjectEnd`    | A `}` ending an object. | |
-| `ArrayStart`   | A `[` starting an array. | |
-| `ArrayEnd`     | A `]` ending an array. | |
-| `StringStart`  | A `"` starting a string (this can be a value, or a key inside an object). | |
-| `StringChunk`  | A part of a string. | `value`: The part of the string. | |
-| `StringEnd`    | A `"` ending a string. | |
-| `NumberValue`  | A number value. | `value`: The number. | |
-| `BooleanValue` | A boolean value. | `value`: The boolean value. | |
-| `NullValue`    | A `null` value. | |
+| `WHITESPACE`   | Whitespace characters without any semantic meaning appearing between JSON tokens. | |
+| `COMMA`        | A `,` that separates two array/object items. | |
+| `COLON`        | A `:` that separates an object key from its value. | |
+| `OBJECT_START`  | A `{` starting an object. | |
+| `OBJECT_END`    | A `}` ending an object. | |
+| `ARRAY_START`   | A `[` starting an array. | |
+| `ARRAY_END`     | A `]` ending an array. | |
+| `STRING_START`  | A `"` starting a string (this can be a value, or a key inside an object). | `role`: `StringRole.KEY` if this string is an object property key, otherwise `StringRole.VALUE`. |
+| `STRING_CHUNK`  | A part of a string. | `value`: The part of the string.<br>`role`: `StringRole.KEY` if this string is an object property key, otherwise `StringRole.VALUE`. | |
+| `STRING_END`    | A `"` ending a string. | `role`: `KEY` if this string is an object property key, otherwise `StringRole.VALUE`. |
+| `NUMBER_VALUE`  | A number value. | `value`: The number. | |
+| `BOOLEAN_VALUE` | A boolean value. | `value`: The boolean value. | |
+| `NULL_VALUE`    | A `null` value. | `value`: `null`. |
 
 In addition to the properties outlined above, each `JsonChunk` has a `rawValue` property that represents the string as the chunk appeared in the document. This means that the `rawValues` of all the chunks concatenated are equal to the stringified JSON document.
 
@@ -36,28 +60,49 @@ For example, take the following JSON document:
 }
 ```
 
-This document would be represented by the following `JsonChunks`:
-```json
-{ type: "ObjectStart", rawValue: "{" }
-{ type: "Whitespace", rawValue: "\n\t" }
-{ type: "StringStart", rawValue: "\"" }
-{ type: "StringChunk", value: "string", rawValue: "string" }
-{ type: "StringEnd", rawValue: "\"" }
-{ type: "Colon": rawValue: ":" }
-{ type: "Whitepsace", rawValue: " " }
-{ type: "StringStart", rawValue: "\"" }
-{ type: "StringChunk", value: "Test ♥", rawValue: "Test \\u2665" }
-{ type: "StringEnd", rawValue: "\"" }
-{ type: "Comma", rawValue: "," }
-{ type: "Whitespace", rawValue: "\n\t" }
-{ type: "StringStart", rawValue: "\"" }
-{ type: "StringChunk", value: "number", rawValue: "number" }
-{ type: "StringEnd", rawValue: "\"" }
-{ type: "Colon": rawValue: ":" }
-{ type: "Whitespace", rawValue: " " }
-{ type: "NumberValue", value: -123, rawValue: "-1.23e2" }
-{ type: "Whitespace", rawValue: "\n" }
-{ type: "ObjectEnd", rawValue: "}" }
+This document would be represented by the following `JsonChunk`s:
+
+```javascript
+{ type: JsonChunkType.OBJECT_START, rawValue: "{" }
+{ type: JsonChunkType.WHITESPACE, rawValue: "\n\t" }
+{ type: JsonChunkType.STRING_START, role: StringRole.KEY, rawValue: "\"" }
+{ type: JsonChunkType.STRING_CHUNK, value: "string", role: StringRole.KEY, rawValue: "string" }
+{ type: JsonChunkType.STRING_END, role: StringRole.KEY, rawValue: "\"" }
+{ type: JsonChunkType.COLON: rawValue: ":" }
+{ type: JsonChunkType.WHITESPACE, rawValue: " " }
+{ type: JsonChunkType.STRING_START, role: StringRole.VALUE, rawValue: "\"" }
+{ type: JsonChunkType.STRING_CHUNK, value: "Test ♥", role: StringRole.VALUE, rawValue: "Test \\u2665" }
+{ type: JsonChunkType.STRING_END, role: StringRole.VALUE, rawValue: "\"" }
+{ type: JsonChunkType.COMMA, rawValue: "," }
+{ type: JsonChunkType.WHITESPACE, rawValue: "\n\t" }
+{ type: JsonChunkType.STRING_START, role: StringRole.KEY, rawValue: "\"" }
+{ type: JsonChunkType.STRING_CHUNK, value: "number", role: StringRole.KEY, rawValue: "number" }
+{ type: JsonChunkType.STRING_END, role: StringRole.KEY, rawValue: "\"" }
+{ type: JsonChunkType.COLON: rawValue: ":" }
+{ type: JsonChunkType.WHITESPACE, rawValue: " " }
+{ type: JsonChunkType.NUMBER_VALUE, value: -123, rawValue: "-1.23e2" }
+{ type: JsonChunkType.WHITESPACE, rawValue: "\n" }
+{ type: JsonChunkType.OBJECT_END, rawValue: "}" }
 ```
 
-The functions exported by json-stream-es are based on these `JsonChunk` objects, and you can also write your own custom functions that consume these objects.
+Note that depending on the chunks that arrive from the underlying `ReadableStream<string>`, the whitespaces and the strings in the JSON document might be split up into multiple `Whitespace` and `StringChunk` chunks.
+
+## API
+
+### `JsonParser`
+
+### `JsonStringifier`
+
+### `JsonDeserializer`
+
+### `JsonSerializer`
+
+### `PathEnricher`
+
+### `PathFilter`
+
+### `JsonChunk` creators
+
+## Attribution
+
+This library is inspired by [creationix/jsonparse](https://github.com/creationix/jsonparse) by Tim Caswell.

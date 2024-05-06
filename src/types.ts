@@ -1,124 +1,186 @@
-export class JsonChunk<Type extends string = string> {
-    constructor(
-        /** The raw JSON code for this chunk. The concatenated rawValues of all chunks form a valid JSON value. */
-        public readonly rawValue: string,
-        public readonly type: Type
-    ) {}
+/** A JavaScript value that can be stringified to JSON. */
+// This would be the right type, but that doesn't work because of circular references.
+// export type JsonValue = Record<string, JsonValue> | Array<JsonValue> | string | number | boolean | null;
+export type JsonValue = any;
 
-    toString() {
-        return this.rawValue;
-    }
+export enum JsonChunkType {
+	/** A whitespace that appears between JSON tokens and has no semantic meaning. */
+	WHITESPACE = "WHITESPACE",
+
+	/** A comma that separates two array/object items. */
+	COMMA = "COMMA",
+
+	/** A colon that separates an object key from its value. */
+	COLON = "COLON",
+
+	/**
+	 * The start of an object, represented by a curly open bracket. Will be followed by zero or more properties, each one represented
+	 * by a string key (one STRING_KEY_START, zero or more STRING_KEY_CHUNKs, one STRING_KEY_END) for the key, a
+	 * COLON, a series of chunks for the value and a COMMA (except for the last property); and finally an OBJECT_END.
+	 */
+	OBJECT_START = "OBJECT_START",
+
+	/** The end of an object, represented by a curly close bracket. */
+	OBJECT_END = "OBJECT_END",
+
+	/**
+	 * The start of an array, represented by a square open bracket. Will be followed by zero or more chunks representing the values,
+	 * each followed by a COMMA (except the last one); and finally an ARRAY_END.
+	 */
+	ARRAY_START = "ARRAY_START",
+
+	/** The end of an array, represented by a square close bracket. */
+	ARRAY_END = "ARRAY_END",
+
+	/**
+	 * The start of a string, represented by a double quote. Will be followed by zero or more STRING_CHUNKs and finally
+	 * a STRING_END.
+	 */
+	STRING_START = "STRING_START",
+
+	/**
+	 * A section of a string value. Unicode characters are always fully included, so an escape value like \uffff will never span across multiple chunks.
+	 */
+	STRING_CHUNK = "STRING_CHUNK",
+
+	/** The end of a string value, represented by a double quote. */
+	STRING_END = "STRING_END",
+
+	/** A number. May be positive/negative and an integer/float, and the raw value can have an exponent. */
+	NUMBER_VALUE = "NUMBER_VALUE",
+
+	/** A boolean, either true or false. */
+	BOOLEAN_VALUE = "BOOLEAN_VALUE",
+
+	/** A null value. */
+	NULL_VALUE = "NULL_VALUE"
 }
 
-/** A whitespace that appears between JSON tokens and has no semantic meaning. */
-export class Whitespace extends JsonChunk<"Whitespace"> {
-    constructor(rawValue: string) {
-        super(rawValue, "Whitespace");
-    }
+export enum StringRole {
+	/** A string used as a property key inside an object. */
+	KEY = "KEY",
+	/** A string used as a value. */
+	VALUE = "VALUE"
 }
 
-/** A comma that separates two array/object items. */
-export class Comma extends JsonChunk<"Comma"> {
-    constructor(rawValue = ",") {
-        super(rawValue, "Comma");
-    }
+export type JsonChunk<Type extends JsonChunkType = JsonChunkType> = Extract<(
+	| { type: JsonChunkType.WHITESPACE }
+	| { type: JsonChunkType.COMMA }
+	| { type: JsonChunkType.COLON }
+	| { type: JsonChunkType.OBJECT_START }
+	| { type: JsonChunkType.OBJECT_END }
+	| { type: JsonChunkType.ARRAY_START }
+	| { type: JsonChunkType.ARRAY_END }
+	| { type: JsonChunkType.STRING_START; role: StringRole }
+	| {
+		type: JsonChunkType.STRING_CHUNK;
+		role: StringRole;
+		/** The string value of the string value, without quotes and with backslash escapes resolved. */
+		value: string;
+	}
+	| { type: JsonChunkType.STRING_END; role: StringRole }
+	| { type: JsonChunkType.NUMBER_VALUE; value: number }
+	| { type: JsonChunkType.BOOLEAN_VALUE; value: boolean }
+	| { type: JsonChunkType.NULL_VALUE; value: null }
+) & {
+	/** The raw JSON code for this chunk. The concatenated rawValues of all chunks form a valid JSON value. */
+	rawValue: string;
+}, { type: Type }>;
+
+export function whitespace(rawValue: string): JsonChunk<JsonChunkType.WHITESPACE> {
+	return {
+		type: JsonChunkType.WHITESPACE,
+		rawValue
+	};
 }
 
-/** A colon that separates an object key from its value. */
-export class Colon extends JsonChunk<"Colon"> {
-    constructor(rawValue = ":") {
-        super(rawValue, "Colon");
-    }
+export function comma(rawValue = ","): JsonChunk<JsonChunkType.COMMA> {
+	return {
+		type: JsonChunkType.COMMA,
+		rawValue
+	};
 }
 
-/**
- * The start of an object, represented by a curly open bracket. Will be followed by zero or more properties, each one represented
- * by a string (one StringStart, zero or more StringChunks, one StringEnd) for the key, a
- * Colon, a series of chunks for the value and a Comma (except for the last property); and finally an ObjectEnd.
- */
-export class ObjectStart extends JsonChunk<"ObjectStart"> {
-    constructor(rawValue = "{") {
-        super(rawValue, "ObjectStart");
-    }
+export function colon(rawValue = ":"): JsonChunk<JsonChunkType.COLON> {
+	return {
+		type: JsonChunkType.COLON,
+		rawValue
+	};
 }
 
-/** The end of an object, represented by a curly close bracket. */
-export class ObjectEnd extends JsonChunk<"ObjectEnd"> {
-    constructor(rawValue = "}") {
-        super(rawValue, "ObjectEnd");
-    }
+export function objectStart(rawValue = "{"): JsonChunk<JsonChunkType.OBJECT_START> {
+	return {
+		type: JsonChunkType.OBJECT_START,
+		rawValue
+	};
 }
 
-/**
- * The start of an array, represented by a square open bracket. Will be followed by zero or more chunks representing the values,
- * each followed by a Comma (except the last one); and finally an ArrayEnd.
- */
-export class ArrayStart extends JsonChunk<"ArrayStart"> {
-    constructor(rawValue = "[") {
-        super(rawValue, "ArrayStart");
-    }
+export function objectEnd(rawValue = "}"): JsonChunk<JsonChunkType.OBJECT_END> {
+	return {
+		type: JsonChunkType.OBJECT_END,
+		rawValue
+	};
 }
 
-/** The end of an array, represented by a square close bracket. */
-export class ArrayEnd extends JsonChunk<"ArrayEnd"> {
-    constructor(rawValue = "]") {
-        super(rawValue, "ArrayEnd");
-    }
+export function arrayStart(rawValue = "["): JsonChunk<JsonChunkType.ARRAY_START> {
+	return {
+		type: JsonChunkType.ARRAY_START,
+		rawValue
+	};
 }
 
-/**
- * The start of a string, represented by a double quote. Will be followed by zero or more StringChunks and finally
- * a StringEnd.
- */
-export class StringStart extends JsonChunk<"StringStart"> {
-    constructor(rawValue = "\"") {
-        super(rawValue, "StringStart");
-    }
+export function arrayEnd(rawValue = "]"): JsonChunk<JsonChunkType.ARRAY_END> {
+	return {
+		type: JsonChunkType.ARRAY_END,
+		rawValue
+	};
 }
 
-/**
- * A section of a string. Unicode characters are always fully included, so an escape value like \uffff will never span across multiple chunks.
- */
-export class StringChunk extends JsonChunk<"StringChunk"> {
-    constructor(
-        /** The string value of the string, without quotes and with backslash escapes resolved. */
-        public readonly value: string,
-        rawValue?: string
-    ) {
-        super(rawValue ?? JSON.stringify(value).slice(1, -1), "StringChunk");
-    }
+export function stringStart(role = StringRole.VALUE, rawValue = "\""): JsonChunk<JsonChunkType.STRING_START> {
+	return {
+		type: JsonChunkType.STRING_START,
+		role,
+		rawValue
+	};
 }
 
-/** The end of a string, represented by a double quote. */
-export class StringEnd extends JsonChunk<"StringEnd"> {
-    constructor(rawValue = "\"") {
-        super(rawValue, "StringEnd");
-    }
+export function stringChunk(value: string, role = StringRole.VALUE, rawValue?: string): JsonChunk<JsonChunkType.STRING_CHUNK> {
+	return {
+		type: JsonChunkType.STRING_CHUNK,
+		role,
+		value,
+		rawValue: rawValue ?? JSON.stringify(value).slice(1, -1)
+	};
 }
 
-/** A number. May be positive/negative and an integer/float, and the raw value can have an exponent. */
-export class NumberValue extends JsonChunk<"NumberValue"> {
-    constructor(
-        public readonly value: number,
-        rawValue?: string
-    ) {
-        super(rawValue ?? JSON.stringify(value), "NumberValue");
-    }
+export function stringEnd(role = StringRole.VALUE, rawValue = "\""): JsonChunk<JsonChunkType.STRING_END> {
+	return {
+		type: JsonChunkType.STRING_END,
+		role,
+		rawValue
+	};
 }
 
-/** A boolean, either true or false. */
-export class BooleanValue extends JsonChunk<"BooleanValue"> {
-    constructor(
-        public readonly value: boolean,
-        rawValue?: string
-    ) {
-        super(rawValue ?? JSON.stringify(value), "BooleanValue");
-    }
+export function numberValue(value: number, rawValue?: string): JsonChunk<JsonChunkType.NUMBER_VALUE> {
+	return {
+		type: JsonChunkType.NUMBER_VALUE,
+		value,
+		rawValue: rawValue ?? JSON.stringify(value)
+	};
 }
 
-/** A null value. */
-export class NullValue extends JsonChunk<"NullValue"> {
-    constructor(rawValue = "null") {
-        super(rawValue, "NullValue");
-    }
+export function booleanValue(value: boolean, rawValue?: string): JsonChunk<JsonChunkType.BOOLEAN_VALUE> {
+	return {
+		type: JsonChunkType.BOOLEAN_VALUE,
+		value,
+		rawValue: rawValue ?? JSON.stringify(value)
+	};
+}
+
+export function nullValue(rawValue = "null"): JsonChunk<JsonChunkType.NULL_VALUE> {
+	return {
+		type: JsonChunkType.NULL_VALUE,
+		value: null,
+		rawValue
+	};
 }
