@@ -80,7 +80,7 @@ const jsonStream = new JsonSerializer({
 }).pipeThrough(new JsonStringifier());
 ```
 
-Each value anywhere the JSON document can be a synchronous value, a promise that resolves to a value or a sync/async function returning a value. Each value can also be an object stream (created by `objectStream()`), an array stream (created by `arrayStream()`) or a string stream (created by `stringStream()`). String streams can also be used as property keys inside object streams. The stream creators accept an `Iterable`, an `AsyncIterable` or a `ReadableStream` data source.
+Each value anywhere the JSON document can be a synchronous value, a promise that resolves to a value, or a sync/async function returning a value. Each value can also be an object stream (created by `objectStream()`), an array stream (created by `arrayStream()`) or a string stream (created by `stringStream()`) (see [stream generators](#stream-generators) for details). String streams can also be used as property keys inside object streams. The stream creators accept an `Iterable`, an `AsyncIterable` or a `ReadableStream` data source.
 
 The stringified JSON stream created by `JsonStringifier` is a `ReadableStream<string>`. Since most JavaScript methods work with `ReadableStream<Uint8Array>` instead, we can convert it using [`TextEncoderStream`](https://developer.mozilla.org/en-US/docs/Web/API/TextEncoderStream) (Node.js >= 18 required). Here is an example of streaming the result in an Express app:
 ```typescript
@@ -91,7 +91,7 @@ app.use("/api/test", (req, res) => {
 	res.header("Content-type", "application/json");
 	const jsonStream = new JsonSerializer({
 		test: "value"
-	}).pipeThrough(new JsonStringifier())
+	}).pipeThrough(new JsonStringifier());
 	jsonStream.pipeTo(Writable.toWeb(res));
 });
 ```
@@ -160,7 +160,7 @@ At its core, json-stream-es handles 3 types of JSON documents:
 * A `ReadableStream<JsonChunk>` is an internal representation of a JSON document, where each [`JsonChunk`](#jsonchunk-objects) represents a section of the document
 * A `JsonValue` is a JavaScript value that can be stringified to JSON (in particular `{ [key: string]: JsonValue } | Array<JsonValue> | string | number | boolean | null`).
 
-The main featurs of json-stream-es are:
+The main features of json-stream-es are:
 * Provide converters to convert between the 3 types of JSON documents:
 	* [`JsonParser`](#jsonparser) (`ReadableStream<string>` → `ReadableStream<JsonChunk>`)
 	* [`JsonStringifier`](#jsonstringifier) (`ReadableStream<JsonChunk>` → `ReadableStream<string>`)
@@ -178,12 +178,12 @@ A `JsonChunk` is an internal representation of a section of the JSON document th
 | --------------- | ----------- | ---------- |
 | `WHITESPACE`    | Whitespace characters without any semantic meaning appearing between JSON tokens. | |
 | `COMMA`         | A `,` that separates two array/object items. | |
-| `COLON`         | A `:` that separates an object key from its value. | |
+| `COLON`         | A `:` that separates an object property key from its value. | |
 | `OBJECT_START`  | A `{` starting an object. | |
 | `OBJECT_END`    | A `}` ending an object. | |
 | `ARRAY_START`   | A `[` starting an array. | |
 | `ARRAY_END`     | A `]` ending an array. | |
-| `STRING_START`  | A `"` starting a string (this can be a value, or a key inside an object). | `role`: `StringRole.KEY` if this string is an object property key, otherwise `StringRole.VALUE`. |
+| `STRING_START`  | A `"` starting a string (this can be a value or an object property key). | `role`: `StringRole.KEY` if this string is an object property key, otherwise `StringRole.VALUE`. |
 | `STRING_CHUNK`  | A part of a string. | `value`: The part of the string.<br>`role`: `StringRole.KEY` if this string is an object property key, otherwise `StringRole.VALUE`. | |
 | `STRING_END`    | A `"` ending a string. | `role`: `KEY` if this string is an object property key, otherwise `StringRole.VALUE`. |
 | `NUMBER_VALUE`  | A number value. | `value`: The number. | |
@@ -243,7 +243,7 @@ The input stream is expected to contain one valid JSON document. If the document
 
 A `TransformStream<JsonChunk, string>` that converts a stream of [`JsonChunk` objects](#jsonchunk-objects) into a stringified JSON stream. The reverse of [`JsonParser`](#jsonparser).
 
-Construct one using `new JsonParser(writableStrategy?: QueuingStrategy<JsonChunk>, readableStrategy?: QueuingStrategy<string>)` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<string>`.
+Construct one using `new JsonStringifier(writableStrategy?: QueuingStrategy<JsonChunk>, readableStrategy?: QueuingStrategy<string>)` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<JsonChunk>`.
 
 Use it in combination with [`JsonSerializer`](#jsonserializer) to generate JSON streams or use the [`JsonChunk` creators](#jsonchunk-creators) if you need manual control over the structure of the generated JSON document.
 

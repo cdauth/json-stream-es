@@ -1,21 +1,21 @@
 import { JsonChunkType, StringRole, type JsonChunk } from "./types";
 import { AbstractTransformStream } from "./utils";
 
+/**
+ * An array that describes the chain of object and array keys that the current value is located under.
+ * String values represent object keys, while numbers represent array indexes (starting at 0).
+ * The root value’s path is an empty array.
+ *
+ * For objects, any chunks between the colon and the comma (or end of object) will have the property
+ * key in the path, while other chunks (such as the object start/end and the key string start/chunk/end)
+ * will have the path of the object itself.
+ * For arrays, any chunks in between the array start and end except the comma will have the array index
+ * in the path, while other chunks (such as the array start/end and the comma) will have the path of
+ * the array itself.
+ */
 export type JsonChunkPath = ReadonlyArray<string | number>;
 
 export type JsonChunkWithPath = JsonChunk & {
-	/**
-	 * An array that describes the chain of object and array keys that the current value is located under.
-	 * String values represent object keys, while numbers represent array indexes (starting at 0).
-	 * The root value’s path is an empty array.
-	 *
-	 * For objects, any chunks between the colon and the comma (or end of object) will have the property
-	 * key in the path, while other chunks (such as the object start/end and the key string start/chunk/end)
-	 * will have the path of the object itself.
-	 * For arrays, any chunks in between the array start and end except the comma will have the array index
-	 * in the path, while other chunks (such as the array start/end and the comma) will have the path of
-	 * the array itself.
-	 */
 	path: JsonChunkPath;
 };
 
