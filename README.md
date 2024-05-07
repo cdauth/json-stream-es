@@ -279,6 +279,32 @@ To support streaming objects, arrays and strings in `JsonSerializer`, some helpe
 
 `stringStream(stream: AnyIterable<string>)` returns a string stream. The data source should emit string chunks.
 
+#### Troubleshooting: `Index signature for type 'string' is missing in type`
+
+If you pass an interface instance to `JsonSerializer`, you might encounter the TypeScript error `Index signature for type 'string' is missing in type`:
+```typescript
+interface Test {
+	test: string;
+}
+const object: Test = { test: "test" };
+new JsonSerializer(object); // Error: Index signature for type 'string' is missing in type 'Test'. ts(2345)
+```
+
+While this seems confusing at first, TypeScript is technically right: The interface can be augmented through declaration merging, and there is no guarantee that additional properties will match the `SerializableJsonValue` type. There are different solutions to this, some of which are listed [on StackOverflow](https://stackoverflow.com/q/37006008/242365):
+* Declare `Test` as `type` instead of `interface`
+* Use `const object: Pick<Test, keyof Test>`
+* Use `new JsonSerializer({ ...object })`.
+
+If none of these work for you, for example because the interfaces are declared by a third party library and are deeply nested, the following helper type should work:
+```typescript
+type InterfaceToType<T> = {
+	[K in keyof T]: InterfaceToType<T[K]>;
+}
+
+const object: InterfaceToType<Test> = { test: "test" };
+new JsonSerializer(object);
+```
+
 ### `PathSelector`
 
 A `TransformStream<JsonChunk, JsonChunk & { path: ReadonlyArray<string | number> }>` that keeps track of the hierarchy of objects and arrays of the incoming chunks, assigns a path to each chunk and filters out the ones that don’t match the provided path selector.

@@ -1,4 +1,4 @@
-import { StringRole, arrayEnd, arrayStart, booleanValue, colon, comma, nullValue, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace, type JsonChunk, type JsonValue } from "./types";
+import { StringRole, arrayEnd, arrayStart, booleanValue, colon, comma, nullValue, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace, type JsonChunk } from "./types";
 import { iterableToSource, iterableToStream, streamToIterable } from "./utils";
 
 type AnyIterable<T> = Iterable<T> | AsyncIterable<T> | ReadableStream<T>;
@@ -41,7 +41,7 @@ export function isArrayStream(value: any): value is ArrayStream<any> {
 
 type SyncOrAsync<T> = T | Promise<T> | (() => T | Promise<T>);
 export type SerializableJsonValue = SyncOrAsync<
-	| { [key: string]: SerializableJsonValue }
+	| { [key: string | number]: SerializableJsonValue }
 	| (ReadableStream<[key: string | StringStream, value: SerializableJsonValue]> & { [objectStreamSymbol]: true }) // Cannot use ObjectStream<StreamedJsonValue> due to circular reference
 	| Array<SerializableJsonValue>
 	| ReadableStream<SerializableJsonValue> & { [arrayStreamSymbol]: true } // Cannot use ArrayStream<StreamedJsonValue> due to circular reference
@@ -65,9 +65,7 @@ async function* serializeJson(value: SerializableJsonValue, space?: string | num
 	const normalizedSpace = normalizeSpace(space);
 	const val = await (typeof value === "function" ? value() : value);
 
-	if (val == null) {
-		yield nullValue();
-	} else if (typeof val === "boolean") {
+	if (typeof val === "boolean") {
 		yield booleanValue(val);
 	} else if (typeof val === "number") {
 		yield numberValue(val);
@@ -102,13 +100,13 @@ async function* serializeJson(value: SerializableJsonValue, space?: string | num
 		}
 
 		yield arrayEnd();
-	} else {
+	} else if (typeof val === "object" && val) {
 		yield objectStart();
 
 		let first = true;
 		for await (const [k, rawV] of isObjectStream(val) ? streamToIterable(val) : Object.entries(val)) {
 			const v = await (typeof rawV === "function" ? rawV() : rawV);
-			if (v === undefined) {
+			if (v === undefined || typeof k === "symbol") {
 				continue;
 			}
 
@@ -123,7 +121,7 @@ async function* serializeJson(value: SerializableJsonValue, space?: string | num
 			}
 
 			yield stringStart(StringRole.KEY);
-			for await (const chunk of isStringStream(k) ? streamToIterable(k) : [k]) {
+			for await (const chunk of isStringStream(k) ? streamToIterable(k) : [`${k}`]) {
 				yield stringChunk(chunk, StringRole.KEY);
 			}
 			yield stringEnd(StringRole.KEY);
@@ -143,6 +141,8 @@ async function* serializeJson(value: SerializableJsonValue, space?: string | num
 		}
 
 		yield objectEnd();
+	} else {
+		yield nullValue();
 	}
 }
 
