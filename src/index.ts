@@ -1,3 +1,4 @@
+export * from "./convenience";
 export * from "./json-deserializer";
 export * from "./json-parser";
 export * from "./json-serializer";

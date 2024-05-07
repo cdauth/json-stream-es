@@ -32,12 +32,12 @@ To use the library in a web app that does not use a bundler, (not recommended in
 
 ### Generate a JSON stream
 
-In its most basic form, [`JsonSerializer`](#jsonserializer) can be combined with [`JsonStringifier`](#jsonstringifier) to create a stringified JSON stream:
+In its most basic form, [`generateJsonStream()`](#generatejsonstream) can be used to create a stringified JSON stream:
 
 ```typescript
-import { JsonSerializer, JsonStringifier } from "json-stream-es";
+import { generateJsonStream() } from "json-stream-es";
 
-const jsonStream = new JsonSerializer({
+const jsonStream = generateJsonStream({
 	object: {
 		property1: "value1",
 		property2: "value2"
@@ -49,13 +49,13 @@ const jsonStream = new JsonSerializer({
 	numberValue: 1.23,
 	booleanValue: true,
 	nullValue: null
-}).pipeThrough(new JsonStringifier());
+});
 ```
 
 Like this, there is not much point yet in streaming the result, as the object is available synchronously. Things get interesting when we use the `objectStream()`, `arrayStream()` and `stringStream()` [stream generators](#stream-generators) and callbacks and promises to generate some values asynchronously:
 
 ```typescript
-import { JsonSerializer, JsonStringifier, objectStream, arrayStream, stringStream } from "json-stream-es";
+import { generateJsonStream, objectStream, arrayStream, stringStream } from "json-stream-es";
 
 async function* generateString(value) {
 	yield value;
@@ -71,67 +71,44 @@ async function* generateArray() {
 	yield generateString("value2");
 }
 
-const jsonStream = new JsonSerializer({
+const jsonStream = generateJsonStream({
 	object: objectStream(generateObject()),
 	array: () => arrayStream(generateArray()),
 	numberValue: Promise.resolve(1.23),
 	booleanValue: async () => true,
 	nullValue: null
-}).pipeThrough(new JsonStringifier());
+});
 ```
 
 Each value anywhere the JSON document can be a synchronous value, a promise that resolves to a value, or a sync/async function returning a value. Each value can also be an object stream (created by `objectStream()`), an array stream (created by `arrayStream()`) or a string stream (created by `stringStream()`) (see [stream generators](#stream-generators) for details). String streams can also be used as property keys inside object streams. The stream creators accept an `Iterable`, an `AsyncIterable` or a `ReadableStream` data source.
 
 The stringified JSON stream created by `JsonStringifier` is a `ReadableStream<string>`. Since most JavaScript methods work with `ReadableStream<Uint8Array>` instead, we can convert it using [`TextEncoderStream`](https://developer.mozilla.org/en-US/docs/Web/API/TextEncoderStream) (Node.js >= 18 required). Here is an example of streaming the result in an Express app:
 ```typescript
-import { JsonSerializer, JsonStringifier, objectStream, arrayStream, stringStream } from "json-stream-es";
+import { generateJsonStream, objectStream, arrayStream, stringStream } from "json-stream-es";
 import { Writable } from "node:stream";
 
 app.use("/api/test", (req, res) => {
 	res.header("Content-type", "application/json");
-	const jsonStream = new JsonSerializer({
+	const jsonStream = new generateJsonStream({
 		test: "value"
-	}).pipeThrough(new JsonStringifier());
+	});
 	jsonStream.pipeTo(Writable.toWeb(res));
 });
 ```
 
+If you prefer the generated JSON to be indented, you can pass a number or string as the second parameter to `generateJsonStream()`. It will behave in the same way as the [`space` parameter of `JSON.stringify()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#space).
+
 ### Consume a JSON stream
 
-[`JsonParser`](#jsonparser) reads a stringified JSON stream into a stream of [`JsonChunk`s](#jsonchunk-objects), and [`JsonDeserializer`](#jsondeserializer) can be used to generate JSON objects from that. Since most JavaScript methods emit a `ReadableStream<Uint8Array>`, we can use [`TextDecoderStream`](https://developer.mozilla.org/en-US/docs/Web/API/TextDecoderStream) to convert that to a string stream (wide browser support since September 2022, so you might need a polyfill). Here is an example how to use it with the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API):
+[`parseJsonStream()`](#parsejsonstream) is a convenience function that parses a stringified JSON stream, selects specific array items or object properties from it and emits their values along with a path where the value is located in the tree of objects and arrays. It consumes a `ReadableStream<string>`. Since most JavaScript methods emit a `ReadableStream<Uint8Array>`, we can use [`TextDecoderStream`](https://developer.mozilla.org/en-US/docs/Web/API/TextDecoderStream) to convert that to a string stream (wide browser support since September 2022, so you might need a polyfill). Here is an example how to use it with the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API):
 
 ```typescript
-import { JsonParser, JsonDeserializer } from "json-stream-es";
+import { parseJsonStream } from "json-stream-es";
 
 const res = await fetch("/api/test"); // Responds with {"results":[{"test":"value1"},"value2"]}
 const stream = res
 	.pipeThrough(new TextDecoderStream())
-	.pipeThrough(new JsonParser())
-	.pipeThrough(new JsonDeserializer());
-
-const reader = stream.getReader();
-while (true) {
-	const { done, value } = await reader.read();
-	if (done) {
-		break;
-	} else {
-		console.log(value.value);
-	}
-}
-```
-
-`JsonDeserializer` reads the JSON chunks and emits a JSON value (an object/array/string/number/boolean/null) each time one has been completely received on the root level of the input stream. Since a JSON document only consists of one JSON value on the root level, in the above example `JsonDeserializer` would emit only one JSON value when the whole input stream has been received, so there is not much point yet in streaming the result.
-
-Streams become useful when consuming values nested somewhere in the JSON document, for example in an array. [`PathSelector`](#pathselector) can be used to pick out JSON values nested somewhere inside the JSON document:
-```typescript
-import { JsonParser, JsonDeserializer, PathSelector } from "json-stream-es";
-
-const res = await fetch("/api/test"); // Responds with {"results":[{"test":"value1"},"value2"]}
-const stream = res
-	.pipeThrough(new TextDecoderStream())
-	.pipeThrough(new JsonParser())
-	.pipeThrough(new PathSelector(["results", undefined]))
-	.pipeThrough(new JsonDeserializer());
+	.pipeThrough(parseJsonStream(["results", undefined));
 
 const reader = stream.getReader();
 while (true) {
@@ -147,11 +124,11 @@ while (true) {
 }
 ```
 
-`PathSelector` expects an array of strings, numbers and `undefined` values, where strings refer to object properties with the specified key, numbers refer to array items with the specified index and `undefined` refers to any object property or array items. In the above example, `["results", undefined]` refers to any value found in the array/object under the `results` property. We could also specify `["results", 1]` to pick only the second array item.
+`parseJsonStream()` expects an array of strings, numbers and `undefined` values, where strings refer to object properties with the specified key, numbers refer to array items with the specified index and `undefined` refers to any object property or array items. In the above example, `["results", undefined]` refers to any value found in the array/object under the `results` property. We could also specify `["results", 1]` to pick only the second array item.
 
-Note that if the root value of your JSON document is an array, you need to use `new PathSelector([undefined])` to stream its items, as no `PathSelector` or an empty path would select the array itself rather than its items.
+Note that if the root value of your JSON document is an array, you need to use `parseJsonStream([undefined])` to stream its items, as an empty path would select the array itself rather than its items.
 
-`PathSelector` can also be passed a function that receives the path of each JSON chunk in the form of an `Array<string | number>` and returns a boolean to indicate whether the chunk should be included.
+`parseJsonStream()` can also be passed a function that receives the path of each JSON chunk in the form of an `Array<string | number>` and returns a boolean to indicate whether the chunk should be included.
 
 ## Architecture
 
@@ -228,6 +205,18 @@ This document would be represented by the following `JsonChunk`s:
 Note that depending on the chunks that arrive from the underlying `ReadableStream<string>`, the whitespaces and the strings in the JSON document might be split up into multiple `Whitespace` and `StringChunk` chunks.
 
 ## API
+
+### `generateJsonStream`
+
+`generateJsonStream(value: SerializableJsonValue, space?: string | number): ReadableStream<string>`
+
+A convenience function to serialize a JSON value into a stringified JSON stream. Under the hood, it creates a [`JsonSerializer`](#jsonserializer) and pipes it through a [`JsonStringifier`](#jsonstringifier). See those for details.
+
+### `parseJsonStream`
+
+`parseJsonStream(selector: PathSelectorExpression): TransformStream<string, { value: JsonValue; path: Array<string | number> }>`
+
+A convenience function to parse a stringified JSON stream, select certain array items and/or object properties from it and stream their values. Returns a transformer chain of a [`JsonParser`](#jsonparser), [`PathSelector`](#pathselector) and [`JsonDeserializer`](#jsondeserializer), see those for details.
 
 ### `JsonParser`
 

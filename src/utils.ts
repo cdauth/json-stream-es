@@ -82,3 +82,24 @@ export abstract class AbstractTransformStream<I, O> extends TransformStream<I, O
 		controller.terminate();
 	}
 }
+
+/**
+ * A TransformStream that is set up by providing a ReadableStream mapper rather than transforming individual chunks using
+ * start(), transform() and flush().
+ * This allows access to ReadableStream methods such as pipeThrough(), which makes it easy to reuse other TransformStreams
+ * in the implementation.
+ * @param transformReadable Retrieves one parameter with a ReadableStream that emits the input data of the TransformStream.
+ *     Should return a ReadableStream whose output will become the output data of the TransformStream.
+ */
+// https://stackoverflow.com/a/78404600/242365
+export class PipeableTransformStream<I, O> extends TransformStream<I, O> {
+	constructor(transformReadable: (readable: ReadableStream<I>) => ReadableStream<O>, writableStrategy?: QueuingStrategy<I>, readableStrategy?: QueuingStrategy<O>) {
+		super({}, writableStrategy);
+		const readable = transformReadable(super.readable as any).pipeThrough(new TransformStream({}, undefined, readableStrategy));
+		Object.defineProperty(this, "readable", {
+			get() {
+				return readable;
+			}
+		});
+	}
+}
