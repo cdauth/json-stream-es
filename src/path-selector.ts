@@ -13,10 +13,10 @@ import { AbstractTransformStream } from "./utils";
  * in the path, while other chunks (such as the array start/end and the comma) will have the path of
  * the array itself.
  */
-export type JsonChunkPath = ReadonlyArray<string | number>;
+export type JsonPath = ReadonlyArray<string | number>;
 
 export type JsonChunkWithPath = JsonChunk & {
-	path: JsonChunkPath;
+	path: JsonPath;
 };
 
 /**
@@ -24,9 +24,9 @@ export type JsonChunkWithPath = JsonChunk & {
  * If this is an array, the path has to start with the items in the array in order to match. Undefined items in the array match any key in the path.
  * If this is a function, it is called with the path and should return true if the path matches the selector.
  */
-export type PathSelectorExpression = Array<string | number | undefined> | ((path: JsonChunkPath) => boolean);
+export type PathSelectorExpression = Array<string | number | undefined> | ((path: JsonPath) => boolean);
 
-export function matchesPathSelector(path: JsonChunkPath, selector: PathSelectorExpression): boolean {
+export function matchesPathSelector(path: JsonPath, selector: PathSelectorExpression): boolean {
 	if (Array.isArray(selector)) {
 		return selector.every((v, i) => (v === undefined ? path.length > i : path[i] === v));
 	} else {

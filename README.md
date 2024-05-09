@@ -89,10 +89,11 @@ import { Writable } from "node:stream";
 
 app.use("/api/test", (req, res) => {
 	res.header("Content-type", "application/json");
-	const jsonStream = new generateJsonStream({
+	new generateJsonStream({
 		test: "value"
-	});
-	jsonStream.pipeTo(Writable.toWeb(res));
+	})
+		.pipeThrough(new TextEncoderStream())
+		.pipeTo(Writable.toWeb(res));
 });
 ```
 
@@ -100,7 +101,7 @@ If you prefer the generated JSON to be indented, you can pass a number or string
 
 ### Consume a JSON stream
 
-[`parseJsonStream()`](#parsejsonstream) is a convenience function that parses a stringified JSON stream, selects specific array items or object properties from it and emits their values along with a path where the value is located in the tree of objects and arrays. It consumes a `ReadableStream<string>`. Since most JavaScript methods emit a `ReadableStream<Uint8Array>`, we can use [`TextDecoderStream`](https://developer.mozilla.org/en-US/docs/Web/API/TextDecoderStream) to convert that to a string stream (wide browser support since September 2022, so you might need a polyfill). Here is an example how to use it with the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API):
+[`parseJsonStream()`](#parsejsonstream) parses a stringified JSON stream, selects specific array items or object properties from it and emits their values, optionally along with a path where the value is located in the tree of objects and arrays. It consumes a `ReadableStream<string>`. Since most JavaScript methods emit a `ReadableStream<Uint8Array>`, we can use [`TextDecoderStream`](https://developer.mozilla.org/en-US/docs/Web/API/TextDecoderStream) to convert that to a string stream (wide browser support since September 2022, so you might need a polyfill). Here is an example how to use it with the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API):
 
 ```typescript
 import { parseJsonStream } from "json-stream-es";
@@ -108,7 +109,7 @@ import { parseJsonStream } from "json-stream-es";
 const res = await fetch("/api/test"); // Responds with {"results":[{"test":"value1"},"value2"]}
 const stream = res
 	.pipeThrough(new TextDecoderStream())
-	.pipeThrough(parseJsonStream(["results", undefined));
+	.pipeThrough(parseJsonStream(["results", undefined], { emitPath: true }));
 
 const reader = stream.getReader();
 while (true) {
@@ -129,6 +130,8 @@ while (true) {
 Note that if the root value of your JSON document is an array, you need to use `parseJsonStream([undefined])` to stream its items, as an empty path would select the array itself rather than its items.
 
 `parseJsonStream()` can also be passed a function that receives the path of each JSON chunk in the form of an `Array<string | number>` and returns a boolean to indicate whether the chunk should be included.
+
+If `emitPath` is `true`, `parseJsonStream()` emits a `ReadableStream<{ value: JsonValue; path: Array<string | number> }>`. Otherwise (which is the default), it emits a `ReadableStream<JsonValue>`.
 
 ## Architecture
 
@@ -214,9 +217,12 @@ A convenience function to serialize a JSON value into a stringified JSON stream.
 
 ### `parseJsonStream`
 
-`parseJsonStream(selector: PathSelectorExpression): TransformStream<string, { value: JsonValue; path: Array<string | number> }>`
+`parseJsonStream(selector: PathSelectorExpression): TransformStream<string, JsonValue>`\
+`parseJsonStream(selector: PathSelectorExpression, { emitPath: true }): TransformStream<string, { value: JsonValue; path: Array<string | number> }>`
 
 A convenience function to parse a stringified JSON stream, select certain array items and/or object properties from it and stream their values. Returns a transformer chain of a [`JsonParser`](#jsonparser), [`PathSelector`](#pathselector) and [`JsonDeserializer`](#jsondeserializer), see those for details.
+
+By default, emits a stream of `JsonValue`s. If `emitPath` is true, emits a stream of `{ value: JsonValue; path: Array<string | number> }` instead. This allows you to to access the property keys when streaming a JSON object.
 
 ### `JsonParser`
 
@@ -300,7 +306,7 @@ A `TransformStream<JsonChunk, JsonChunk & { path: ReadonlyArray<string | number>
 
 The path is provided using an array of strings and numbers, where strings are object property keys and numbers are array item indexes. For example, in the JSON document `{ "key1": "value1", "key2": ["value2", "value3"] }`, the chunks of the parts `{ "key1":`, `, "key2":` and `}` would have a path `[]`, the chunks of the part ` "value1"` would have the path `["key1"]`, the chunks of the parts ` [`, `,` and `] ` would have the path `["key2"]`, the chunks of `"value2"` would have the path `["key2", 0]` and `"value3"` would have `["key2", 1]`. In other words, for objects the chunks between `:` and `,`/`}` receive a property key in the path, and for arrays the chunks between `[` and `]` except `,` receive an item index.
 
-`PathSelector` can be constructed using `new PathSelector(selector: Array<string | number | undefined> | ((path: JsonChunkPath) => boolean), writableStrategy?: QueuingStrategy<JsonChunk>, readableStrategy?: QueuingStrategy<JsonChunkWithPath>)`. If you specify the selector as an array, it will match any values with this path. `undefined` in the selector array will act as a wildcard that matches any key. Alternatively, you can specify a selector function to have more control. Note that once a selector matches a path, it will also match all sub paths of the matched value.
+`PathSelector` can be constructed using `new PathSelector(selector: Array<string | number | undefined> | ((path: Array<string | number>) => boolean), writableStrategy?: QueuingStrategy<JsonChunk>, readableStrategy?: QueuingStrategy<JsonChunkWithPath>)`. If you specify the selector as an array, it will match any values with this path. `undefined` in the selector array will act as a wildcard that matches any key. Alternatively, you can specify a selector function to have more control. Note that once a selector matches a path, it will also match all sub paths of the matched value.
 
 The `JsonChunk` stream emitted by `PathSelector` is different from other `JsonChunk` streams in the fact that it may emit multiple JSON values on the root level. Typically, the stream is piped through [`JsonDeserializer`](#jsondeserializer) to convert it into actual JavaScript values.
 

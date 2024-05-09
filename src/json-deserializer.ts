@@ -1,4 +1,4 @@
-import type { JsonChunkPath, JsonChunkWithPath } from "./path-selector";
+import type { JsonPath, JsonChunkWithPath } from "./path-selector";
 import { JsonChunkType, StringRole, type JsonChunk, type JsonValue } from "./types";
 import { AbstractTransformStream } from "./utils";
 
@@ -8,7 +8,7 @@ enum StateType {
 	ARRAY_ITEM = "ARRAY_ITEM"
 };
 
-type AnyState<C extends JsonChunk & { path?: JsonChunkPath }> = (
+type AnyState<C extends JsonChunk & { path?: JsonPath }> = (
 	{
 		type: StateType.ROOT;
 		value: JsonValue | undefined;
@@ -27,15 +27,15 @@ type AnyState<C extends JsonChunk & { path?: JsonChunkPath }> = (
 	}
 );
 
-type State<C extends JsonChunk & { path?: JsonChunkPath }, Type extends StateType = StateType> = Extract<AnyState<C>, { type: Type }>;
+type State<C extends JsonChunk & { path?: JsonPath }, Type extends StateType = StateType> = Extract<AnyState<C>, { type: Type }>;
 
-export type JsonValueAndPath<C extends JsonChunk & { path?: JsonChunkPath }> = { value: JsonValue; path: C["path"] };
+export type JsonValueAndPath<C extends JsonChunk & { path?: JsonPath }> = { value: JsonValue; path: C["path"] };
 
 /**
  * Converts a stream of JsonChunks into JsonValues. The input stream may contain multiple JSON documents on the root level, as
  * produced by PathFilter or by concatenating multiple JsonChunk streams.
  */
-export class JsonDeserializer<C extends JsonChunk & { path?: JsonChunkPath } = JsonChunkWithPath> extends AbstractTransformStream<C, JsonValueAndPath<C>> {
+export class JsonDeserializer<C extends JsonChunk & { path?: JsonPath } = JsonChunkWithPath> extends AbstractTransformStream<C, JsonValueAndPath<C>> {
 	protected state: State<C> = { type: StateType.ROOT, value: undefined, path: [] };
 
 	protected handleValueEnd(controller: TransformStreamDefaultController<JsonValueAndPath<C>>): void {
