@@ -1,4 +1,4 @@
-import type { JsonPath, JsonChunkWithPath } from "./path-selector";
+import type { JsonChunkWithPath, JsonPath } from "./json-path-detector";
 import { JsonChunkType, StringRole, type JsonChunk, type JsonValue } from "./types";
 import { AbstractTransformStream } from "./utils";
 
@@ -29,16 +29,17 @@ type AnyState<C extends JsonChunk & { path?: JsonPath }> = (
 
 type State<C extends JsonChunk & { path?: JsonPath }, Type extends StateType = StateType> = Extract<AnyState<C>, { type: Type }>;
 
-export type JsonValueAndPath<C extends JsonChunk & { path?: JsonPath }> = { value: JsonValue; path: C["path"] };
+export type JsonValueAndOptionalPath<C extends JsonChunk & { path?: JsonPath }> = { value: JsonValue; path: C["path"] };
+export type JsonValueAndPath = JsonValueAndOptionalPath<JsonChunkWithPath>;
 
 /**
  * Converts a stream of JsonChunks into JsonValues. The input stream may contain multiple JSON documents on the root level, as
- * produced by PathFilter or by concatenating multiple JsonChunk streams.
+ * produced by JsonPathSelector or by concatenating multiple JsonChunk streams.
  */
-export class JsonDeserializer<C extends JsonChunk & { path?: JsonPath } = JsonChunkWithPath> extends AbstractTransformStream<C, JsonValueAndPath<C>> {
+export class JsonDeserializer<C extends JsonChunk & { path?: JsonPath } = JsonChunkWithPath> extends AbstractTransformStream<C, JsonValueAndOptionalPath<C>> {
 	protected state: State<C> = { type: StateType.ROOT, value: undefined, path: [] };
 
-	protected handleValueEnd(controller: TransformStreamDefaultController<JsonValueAndPath<C>>): void {
+	protected handleValueEnd(controller: TransformStreamDefaultController<JsonValueAndOptionalPath<C>>): void {
 		if (this.state.type === StateType.ROOT) {
 			if (this.state.value !== undefined) {
 				controller.enqueue({ value: this.state.value, path: this.state.path });
@@ -58,7 +59,7 @@ export class JsonDeserializer<C extends JsonChunk & { path?: JsonPath } = JsonCh
 		}
 	}
 
-	protected override transform(chunk: C, controller: TransformStreamDefaultController<JsonValueAndPath<C>>): void {
+	protected override transform(chunk: C, controller: TransformStreamDefaultController<JsonValueAndOptionalPath<C>>): void {
 		if (chunk.type === JsonChunkType.NUMBER_VALUE || chunk.type === JsonChunkType.BOOLEAN_VALUE || chunk.type === JsonChunkType.NULL_VALUE) {
 			this.state.value = chunk.value;
 			if (this.state.type === StateType.ROOT) {
