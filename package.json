@@ -17,7 +17,13 @@
 		"node": ">=18.0.0"
 	},
 	"devDependencies": {
+		"@types/eslint": "^8.56.10",
 		"@types/node": "^20.12.8",
+		"@typescript-eslint/eslint-plugin": "^7.9.0",
+		"@typescript-eslint/parser": "^7.9.0",
+		"eslint": "8",
+		"eslint-import-resolver-typescript": "^3.6.1",
+		"eslint-plugin-import": "^2.29.1",
 		"rimraf": "^5.0.5",
 		"typescript": "^5.4.5",
 		"vite": "^5.2.11",
@@ -30,7 +36,8 @@
 		"clean": "rimraf dist out out.node",
 		"test": "vitest run",
 		"test-watch": "vitest",
-		"check-types": "tsc -b tsconfig.node.json --emitDeclarationOnly"
+		"check-types": "tsc -b tsconfig.node.json --emitDeclarationOnly",
+		"lint": "eslint --ext .js,.mjs,.cjs,.ts,.mts,.cts ./"
 	},
 	"bugs": "https://github.com/cdauth/json-stream-es/issues",
 	"license": "BSD-2-Clause",
