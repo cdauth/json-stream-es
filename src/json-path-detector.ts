@@ -41,7 +41,7 @@ export class JsonPathDetector extends AbstractTransformStream<JsonChunk, JsonChu
 		super(writableStrategy, readableStrategy);
 	}
 
-	protected override transform(chunk: JsonChunk, controller: TransformStreamDefaultController<JsonChunkWithPath>) {
+	protected override transform(chunk: JsonChunk, controller: TransformStreamDefaultController<JsonChunkWithPath>): void {
 		if (this.stack[this.stack.length - 1]?.state === "next") {
 			this.stack[this.stack.length - 1].state = "active";
 			this.path.push(this.stack[this.stack.length - 1].key);

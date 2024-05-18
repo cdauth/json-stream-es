@@ -6,9 +6,9 @@ import { streamToArray } from "../utils";
 test("empty object", async () => {
 	const transform = new TransformStream<string, string>();
 	const writer = transform.writable.getWriter();
-	writer.write("{");
-	writer.write("}");
-	writer.close();
+	void writer.write("{");
+	void writer.write("}");
+	void writer.close();
 
 	const chunks = await streamToArray(transform.readable.pipeThrough(new JsonParser()));
 	expect(chunks).toEqual([
@@ -20,10 +20,10 @@ test("empty object", async () => {
 test("object", async () => {
 	const transform = new TransformStream<string, string>();
 	const writer = transform.writable.getWriter();
-	writer.write("{\"key");
-	writer.write(" 1\": \"value");
-	writer.write(" 1\", \"key 2\": \"value 2\"}");
-	writer.close();
+	void writer.write("{\"key");
+	void writer.write(" 1\": \"value");
+	void writer.write(" 1\", \"key 2\": \"value 2\"}");
+	void writer.close();
 
 	const chunks = await streamToArray(transform.readable.pipeThrough(new JsonParser()));
 	expect(chunks).toEqual([

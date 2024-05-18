@@ -172,7 +172,7 @@ for await (const subStream of streamToIterable(stream)) {
 
 If you need access to the property keys inside the sub streams, you can use [`parseJsonStreamAsSubStreamsWithPaths`](#parsejsonstreamassubstreamswithpaths) instead. The resulting sub streams have their parent path prefixes removed from their paths, so in the above example, the individual apples and cherries would be emitted with paths `[0]` and `[1]`, without the `["apples", "results"]` and `["cherries", "results"]`.
 
-**Note:** For the stream of sub streams to be generated, the sub streams need to be consumed. If you try to consume the parent stream without consuming the sub streams, the parent stream will just hang indefinitely.
+**Note:** If you iterate over the parent stream without consuming the sub streams, the results of the sub streams will be cached in memory. If you don’t need a particular sub stream, discard it using `subStream.cancel()` (when using `break` in a stream iterator, the stream is canceled automatically).
 
 ## Concepts
 
@@ -426,7 +426,7 @@ A `TransformStream<JsonChunkWithPath, ReadableStream<JsonChunkWithPath> & { path
 
 The emitted sub-streams have an additional `path` property that represents the path of the value that the sub-stream is for. The individual chunks of the sub-stream have this part of the path removed from their `path`, so that the sub stream behaves like any regular JSON stream where the selected value would be on the root level.
 
-**Note:** For the stream of sub streams to be generated, the sub streams need to be consumed. If you try to consume the parent stream without consuming the sub streams, the parent stream will just hang indefinitely.
+**Note:** If you iterate over the parent stream without consuming the sub streams, the results of the sub streams will be cached in memory. If you don’t need a particular sub stream, discard it using `subStream.cancel()` (when using `break` in a stream iterator, the stream is canceled automatically).
 
 ### Utils
 

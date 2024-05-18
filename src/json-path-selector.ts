@@ -38,7 +38,7 @@ export class JsonPathSelector extends AbstractTransformStream<JsonChunkWithPath,
 		super(writableStrategy, readableStrategy);
 	}
 
-	protected override transform(chunk: JsonChunkWithPath, controller: TransformStreamDefaultController<JsonChunkWithPath>) {
+	protected override transform(chunk: JsonChunkWithPath, controller: TransformStreamDefaultController<JsonChunkWithPath>): void {
 		if (this.currentPathPrefix && arrayStartsWith(chunk.path, this.currentPathPrefix)) {
 			controller.enqueue(chunk);
 		} else if (matchesJsonPathSelector(chunk.path, this.selector)) {
@@ -49,7 +49,7 @@ export class JsonPathSelector extends AbstractTransformStream<JsonChunkWithPath,
 		}
 	}
 
-	protected override flush(controller: TransformStreamDefaultController<JsonChunkWithPath>) {
+	protected override flush(controller: TransformStreamDefaultController<JsonChunkWithPath>): void {
 		controller.terminate();
 	}
 }

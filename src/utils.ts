@@ -5,13 +5,18 @@
 export async function* streamToIterable<T>(stream: ReadableStream<T>): AsyncIterable<T> {
 	const reader = stream.getReader();
 
-	while (true) {
-		const { done, value } = await reader.read();
-		if (done) {
-			return;
-		} else {
-			yield value;
+	try {
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) {
+				return;
+			} else {
+				yield value;
+			}
 		}
+	} finally {
+		// Is also called if iterator is quit early (by using break;)
+		reader.cancel().catch(() => undefined);
 	}
 }
 
@@ -40,6 +45,7 @@ export async function streamToArray<T>(stream: ReadableStream<T>): Promise<T[]> 
 	const reader = stream.getReader();
 	const result: T[] = [];
 
+	// eslint-disable-next-line no-constant-condition
 	while (true) {
 		const { done, value } = await reader.read();
 		if (done) {
@@ -64,9 +70,9 @@ export function concatStreams<T>(...streams: Array<ReadableStream<T> | (() => Re
 		for (const stream of streams) {
 			await (typeof stream === "function" ? stream() : stream).pipeTo(transform.writable, { preventClose: true });
 		}
-		transform.writable.close();
-	})().catch((err) => {
-		transform.writable.abort(err);
+		await transform.writable.close();
+	})().catch(async (err) => {
+		await transform.writable.abort(err);
 	});
 	return transform.readable;
 }
@@ -113,7 +119,8 @@ export class AbortHandlingTransformStream<I, O> extends TransformStream<I, O> {
         });
 
         Object.defineProperty(this, "writable", {
-            get: () => writable
+            get: () => writable,
+			configurable: true
         });
     }
 }

@@ -145,7 +145,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 	 * @param char The next character on the stream. Is used to check whether the current token ends (for example, a number is ended
 	 *     by a non-number character). If undefined, the stream is assumed to have ended, so the current token must always end.
 	 */
-	protected checkValueEnd(controller: TransformStreamDefaultController<JsonChunk>, char: string | undefined) {
+	protected checkValueEnd(controller: TransformStreamDefaultController<JsonChunk>, char: string | undefined): void {
 		if (this.state.type === StateType.WHITESPACE && (char == null || !WHITESPACE_CHARS.includes(char))) {
 			if (this.state.rawValue.length > 0) {
 				controller.enqueue(whitespace(this.state.rawValue));
@@ -166,7 +166,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 	/**
 	 * Handle a single character piped into the stream.
 	 */
-	protected handleChar(controller: TransformStreamDefaultController<JsonChunk>, context: Context) {
+	protected handleChar(controller: TransformStreamDefaultController<JsonChunk>, context: Context): void {
 		const char = context.char;
 
 		// End chunks that don't have an explicit end char
@@ -464,7 +464,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 	 * Called at the end of the transformation of a chunk. Should flush partial values where applicable,
 	 * in particular and incomplete strings or whitespaces can be emitted.
 	 */
-	protected handleChunkEnd(controller: TransformStreamDefaultController<JsonChunk>) {
+	protected handleChunkEnd(controller: TransformStreamDefaultController<JsonChunk>): void {
 		const stringState = (
 			this.state.type === StateType.STRING ? this.state :
 			isState(this.state, [StateType.STRING_AFTER_BACKSLASH, StateType.STRING_AFTER_BACKSLASH_U]) ? this.state.parentState :
@@ -485,7 +485,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 	/**
 	 * Transforms an incoming chunk.
 	 */
-	protected override transform(chunk: string, controller: TransformStreamDefaultController<JsonChunk>) {
+	protected override transform(chunk: string, controller: TransformStreamDefaultController<JsonChunk>): void {
 		for (let i = 0; i < chunk.length; i++) {
 			this.handleChar(controller, { char: chunk[i], position: this.lengthBeforeCurrentChunk + i });
 		}
@@ -497,7 +497,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 	/**
 	 * Called when the end of the incoming stream is reached. Checks that a complete value has been emitted.
 	 */
-	protected override flush(controller: TransformStreamDefaultController<JsonChunk>) {
+	protected override flush(controller: TransformStreamDefaultController<JsonChunk>): void {
 		this.checkValueEnd(controller, undefined);
 
 		if (this.state.type !== StateType.END) {

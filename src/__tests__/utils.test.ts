@@ -10,13 +10,13 @@ describe("AbortHandlingTransformStream", () => {
 		const writer = transform.writable.getWriter();
 		const reader = transform.readable.getReader();
 
-		writer.write("test1");
+		void writer.write("test1");
 		expect(await reader.read()).toEqual({ done: false, value: "test1" });
 
-		writer.write("test2");
+		void writer.write("test2");
 		expect(await reader.read()).toEqual({ done: false, value: "test2" });
 
-		writer.close();
+		void writer.close();
 		expect(await reader.read()).toEqual({ done: true });
 
 		expect(abort).toBeCalledTimes(0);
@@ -29,7 +29,7 @@ describe("AbortHandlingTransformStream", () => {
 		const reader = transform.readable.getReader();
 
 		const reason = new Error("test1");
-		writer.abort(reason);
+		void writer.abort(reason);
 
 		await expect(async () => await reader.read()).rejects.toThrowError("test1");
 	});
@@ -44,7 +44,7 @@ describe("AbortHandlingTransformStream", () => {
 		const reader = transform.readable.getReader();
 
 		const reason = new Error("test1");
-		writer.abort(reason);
+		void writer.abort(reason);
 
 		await expect(async () => await reader.read()).rejects.toThrowError("test2");
 		expect(abort).toBeCalledTimes(1);
@@ -62,7 +62,7 @@ describe("AbortHandlingTransformStream", () => {
 		const reader = transform.readable.getReader();
 
 		const reason = new Error("test1");
-		writer.abort(reason);
+		void writer.abort(reason);
 
 		await expect(async () => await reader.read()).rejects.toThrowError("test2");
 		// expect(abort).toBeCalledTimes(1);
