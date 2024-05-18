@@ -107,13 +107,44 @@ describe("JsonPathStreamSplitter", () => {
 			.pipeThrough(new JsonPathStreamSplitter());
 
 		const reader = stream.getReader();
-		// const sub1 = await reader.read();
-		// const sub2 = await reader.read();
+		const sub1 = await reader.read();
+		const sub2 = await reader.read();
 
 		writer.abort(new Error("test")).catch(() => undefined);
 
 		await expect(async () => await reader.read()).rejects.toThrowError("test");
-		// await expect(async () => await streamToArray(sub1.value!)).rejects.toThrowError("test");
-		// await expect(async () => await streamToArray(sub2.value!)).rejects.toThrowError("test");
+		await expect(async () => await streamToArray(sub1.value!)).rejects.toThrowError("test");
+		await expect(async () => await streamToArray(sub2.value!)).rejects.toThrowError("test");
+	});
+
+	test("back pressure is applied", async () => {
+		const transform = new TransformStream<string, string>();
+
+		let chunksWritten = 0;
+		const writer = transform.writable.getWriter();
+		void (async () => {
+			for (const chunk of testStream) {
+				await writer.write(chunk);
+				chunksWritten++;
+			}
+			await writer.close();
+		})();
+
+		const stream = transform.readable
+			.pipeThrough(new JsonParser())
+			.pipeThrough(new JsonPathDetector())
+			.pipeThrough(new JsonPathSelector([undefined, "results"]))
+			.pipeThrough(new JsonPathStreamSplitter());
+
+		expect(chunksWritten).toBe(0);
+
+		const reader = stream.getReader();
+		await reader.read();
+
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		// Each TransformStream in the pipe seems to have a small internal queue by default, so it is difficult to tell
+		// how many chunks should have been consumed by now. But as long as not all of them have been consumed, it should
+		// be safe to assume that some form of back pressure was applied.
+		expect(chunksWritten).toBeLessThan(testStream.length);
 	});
 });
