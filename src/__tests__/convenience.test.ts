@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { generateJsonStream, parseJsonStream, parseJsonStreamAsSubStreams, parseJsonStreamAsSubStreamsWithPaths, parseJsonStreamWithPaths } from "../convenience";
+import { stringifyJsonStream, parseJsonStream, parseJsonStreamAsSubStreams, parseJsonStreamAsSubStreamsWithPaths, parseJsonStreamWithPaths } from "../convenience";
 import { arrayStream, objectStream } from "../json-serializer";
 import { streamToArray, streamToIterable, streamToString, stringToStream } from "../utils";
 import type { JsonPath } from "../json-path-detector";
@@ -20,8 +20,8 @@ test.each([
 	{ space: undefined, description: "no indentation" },
 	{ space: "\t", description: "tab indentation" },
 	{ space: 4, description: "4 spaces indentation" }
-])("generateJsonStream ($description)", async ({ space }) => {
-	const stream = generateJsonStream({
+])("stringifyJsonStream ($description)", async ({ space }) => {
+	const stream = stringifyJsonStream({
 		apples: { results: arrayStream(testObject.apples.results) },
 		cherries: { results: objectStream(Object.entries(testObject.cherries.results)) }
 	}, space);

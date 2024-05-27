@@ -117,3 +117,20 @@ export class JsonDeserializer<C extends JsonChunk & { path?: JsonPath } = JsonCh
 		}
 	}
 }
+
+/**
+ * Converts a stream of JsonChunks into a single JsonValue. The input stream must contain exactly one JSON documents on the root level.
+ */
+export async function deserializeJsonValue(stream: ReadableStream<JsonChunk>): Promise<JsonValue> {
+	const reader = stream.pipeThrough(new JsonDeserializer()).getReader();
+	const { value, done: done1 } = await reader.read();
+	if (done1) {
+		throw new Error("The stream did not contain any values.");
+	}
+	const { done: done2 } = await reader.read();
+	if (!done2) {
+		reader.cancel().catch(() => undefined);
+		throw new Error("The stream contained more than one value.");
+	}
+	return value.value;
+}

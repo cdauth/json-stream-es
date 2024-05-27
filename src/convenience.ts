@@ -8,7 +8,7 @@ import { JsonPathStreamSplitter } from "./json-path-stream-splitter";
 import type { JsonValue } from "./types";
 import { AbstractTransformStream, PipeableTransformStream } from "./utils";
 
-export function generateJsonStream(value: SerializableJsonValue, space?: string | number): ReadableStream<string> {
+export function stringifyJsonStream(value: SerializableJsonValue, space?: string | number): ReadableStream<string> {
 	return new JsonSerializer(value, space).pipeThrough(new JsonStringifier());
 }
 

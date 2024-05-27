@@ -24,7 +24,7 @@ To use the library in a web app that does not use a bundler, (not recommended in
 	}
 </script>
 <script type="module">
-	import { generateJsonStream, parseJsonStream } from "json-stream-es";
+	import { stringifyJsonStream, parseJsonStream } from "json-stream-es";
 </script>
 ```
 
@@ -32,12 +32,12 @@ To use the library in a web app that does not use a bundler, (not recommended in
 
 ### Generate a JSON stream
 
-In its most basic form, [`generateJsonStream()`](#generatejsonstream) can be used to create a stringified JSON stream:
+In its most basic form, [`stringifyJsonStream()`](#stringifyjsonstream) can be used to create a stringified JSON stream:
 
 ```typescript
-import { generateJsonStream } from "json-stream-es";
+import { stringifyJsonStream } from "json-stream-es";
 
-const jsonStream = generateJsonStream({
+const jsonStream = stringifyJsonStream({
 	object: {
 		property1: "value1",
 		property2: "value2"
@@ -55,7 +55,7 @@ const jsonStream = generateJsonStream({
 Like this, there is not much point yet in streaming the result, as the object is available synchronously. Things get interesting when we use the `objectStream()`, `arrayStream()` and `stringStream()` [stream generators](#stream-generators) and callbacks and promises to generate some values asynchronously:
 
 ```typescript
-import { generateJsonStream, objectStream, arrayStream, stringStream } from "json-stream-es";
+import { stringifyJsonStream, objectStream, arrayStream, stringStream } from "json-stream-es";
 
 async function* generateString(value) {
 	yield value;
@@ -71,7 +71,7 @@ async function* generateArray() {
 	yield generateString("value2");
 }
 
-const jsonStream = generateJsonStream({
+const jsonStream = stringifyJsonStream({
 	object: objectStream(generateObject()),
 	array: () => arrayStream(generateArray()),
 	numberValue: Promise.resolve(1.23),
@@ -84,12 +84,12 @@ Each value anywhere the JSON document can be a synchronous value, a promise that
 
 The stringified JSON stream created by `JsonStringifier` is a `ReadableStream<string>`. Since most JavaScript methods work with `ReadableStream<Uint8Array>` instead, we can convert it using [`TextEncoderStream`](https://developer.mozilla.org/en-US/docs/Web/API/TextEncoderStream) (Node.js >= 18 required). Here is an example of streaming the result in an Express app:
 ```typescript
-import { generateJsonStream, objectStream, arrayStream, stringStream } from "json-stream-es";
+import { stringifyJsonStream, objectStream, arrayStream, stringStream } from "json-stream-es";
 import { Writable } from "node:stream";
 
 app.use("/api/test", (req, res) => {
 	res.header("Content-type", "application/json");
-	new generateJsonStream({
+	new stringifyJsonStream({
 		test: "value"
 	})
 		.pipeThrough(new TextEncoderStream())
@@ -97,7 +97,7 @@ app.use("/api/test", (req, res) => {
 });
 ```
 
-If you prefer the generated JSON to be indented, you can pass a number or string as the second parameter to `generateJsonStream()`. It will behave in the same way as the [`space` parameter of `JSON.stringify()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#space).
+If you prefer the generated JSON to be indented, you can pass a number or string as the second parameter to `stringifyJsonStream()`. It will behave in the same way as the [`space` parameter of `JSON.stringify()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#space).
 
 ### Consume a JSON stream
 
@@ -155,7 +155,7 @@ Each of the nested streams gets a `path` property that indicates the path of the
 
 ```typescript
 const stream = res
-	.pipeThrough(parseJsonStreamAsSubStreams(["results"]));
+	.pipeThrough(parseJsonStreamAsSubStreams([["apples", "cherries"], "results"]));
 
 for await (const subStream of streamToIterable(stream)) {
 	if (subStream.path[0] === "apples") {
@@ -288,9 +288,9 @@ stream.pipeThrough(parseJsonStream((path) => (
 
 ### Convenience functions
 
-#### `generateJsonStream`
+#### `stringifyJsonStream`
 
-`generateJsonStream(value: SerializableJsonValue, space?: string | number): ReadableStream<string>`
+`stringifyJsonStream(value: SerializableJsonValue, space?: string | number): ReadableStream<string>`
 
 A convenience function to serialize a JSON value into a stringified JSON stream. Under the hood, it creates a [`JsonSerializer`](#jsonserializer) and pipes it through a [`JsonStringifier`](#jsonstringifier). See those for details.
 
@@ -353,6 +353,14 @@ Construct it using `new JsonDeserializer(writableStrategy?: QueuingStrategy<Json
 Usually this is used on a stream created by [`JsonParser`](#jsonparser) and piped through [`JsonPathSelector`](#jsonpathselector) to consume a JSON stream.
 
 Note that the stream does not check the validity of the incoming `JsonChunk` objects. If you pass in chunks in an order that does not make sense, the stream will produce unpredictable output.
+
+##### `deserializeJsonValue`
+
+`deserializeJsonValue(stream: ReadableStream<JsonChunk>): Promise<JsonValue>`
+
+Sometimes, your `ReadableStream<JsonChunk>` may contain only one JSON value that you want to decode. A typical scenario for this is a nested stream created by [`JsonPathStreamSplitter`](#jsonpathstreamsplitter) where a sub stream contains only one value.
+
+For your convenience, `deserializeJsonValue` pipes your stream to a `JsonDeserializer` and returns the JSON value emitted by it. If your stream contains more or less than 1 JSON value, an error is thrown.
 
 #### `JsonSerializer`
 
