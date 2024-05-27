@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { streamToArray } from "../utils";
 import { JsonPathSelector, matchesJsonPathSelector, type JsonPathSelectorExpression } from "../json-path-selector";
-import { JsonSerializer } from "../json-serializer";
+import { serializeJsonValue } from "../json-serializer";
 import { JsonDeserializer } from "../json-deserializer";
 import { JsonPathDetector } from "../json-path-detector";
 
@@ -32,7 +32,7 @@ test("PathSelector selects path", async () => {
 		}
 	};
 
-	const select = async (selector: JsonPathSelectorExpression) => await streamToArray(new JsonSerializer(json).pipeThrough(new JsonPathDetector()).pipeThrough(new JsonPathSelector(selector)).pipeThrough(new JsonDeserializer()));
+	const select = async (selector: JsonPathSelectorExpression) => await streamToArray(serializeJsonValue(json).pipeThrough(new JsonPathDetector()).pipeThrough(new JsonPathSelector(selector)).pipeThrough(new JsonDeserializer()));
 
 	expect(await select([])).toEqual([
 		{ value: json, path: [] }

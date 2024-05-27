@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { JsonSerializer, arrayStream, objectStream, stringStream } from "../json-serializer";
+import { arrayStream, objectStream, serializeJsonValue, stringStream } from "../json-serializer";
 import { JsonStringifier } from "../json-stringifier";
 import { streamToString } from "../utils";
 
@@ -8,7 +8,7 @@ test.each([
 	{ space: "\t", desc: "tab" },
 	{ space: 4, desc: "4" },
 ])("JsonSerializer ($desc space)", async ({ space }) => {
-	const stream = new JsonSerializer({
+	const stream = serializeJsonValue({
 		test1: { test: 'object' },
 		test2: {
 			one: "one",

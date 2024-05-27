@@ -1,5 +1,5 @@
 import { StringRole, arrayEnd, arrayStart, booleanValue, colon, comma, nullValue, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace, type JsonChunk } from "./types";
-import { iterableToSource, iterableToStream, streamToIterable } from "./utils";
+import { AbstractTransformStream, iterableToStream, streamToIterable } from "./utils";
 
 type AnyIterable<T> = Iterable<T> | AsyncIterable<T> | ReadableStream<T>;
 
@@ -147,10 +147,26 @@ async function* serializeJson(value: SerializableJsonValue, space?: string | num
 }
 
 /**
- * Converts any JSON-stringifiable JavaScript value into a stream of JsonChunks.
+ * Converts any JSON-stringifiable JavaScript values into a stream of JsonChunks.
  */
-export class JsonSerializer extends ReadableStream<JsonChunk> {
-	constructor(value: SerializableJsonValue, space?: string | number, strategy?: QueuingStrategy<JsonChunk>) {
-		super(iterableToSource(serializeJson(value, space)), strategy);
+export class JsonSerializer extends AbstractTransformStream<SerializableJsonValue, JsonChunk> {
+	constructor(protected space?: string | number, writableStrategy?: QueuingStrategy<SerializableJsonValue>, readableStrategy?: QueuingStrategy<JsonChunk>) {
+		super(writableStrategy, readableStrategy);
 	}
+
+	override async transform(value: SerializableJsonValue, controller: TransformStreamDefaultController<JsonChunk>): Promise<void> {
+		for await (const chunk of serializeJson(value, this.space)) {
+			controller.enqueue(chunk);
+		}
+	}
+}
+/**
+ * Converts any single JSON-stringifiable JavaScript value into a stream of JsonChunks.
+ */
+export function serializeJsonValue(value: SerializableJsonValue, space?: string | number): ReadableStream<JsonChunk> {
+	const serializer = new JsonSerializer(space);
+	const writer = serializer.writable.getWriter();
+	writer.write(value).catch(() => undefined);
+	writer.close().catch(() => undefined);
+	return serializer.readable;
 }

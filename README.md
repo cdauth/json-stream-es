@@ -364,13 +364,19 @@ For your convenience, `deserializeJsonValue` pipes your stream to a `JsonDeseria
 
 #### `JsonSerializer`
 
-A `ReadableStream<JsonChunk>` that emits the `JsonChunk` objects for a JSON value that it is initialized with. In a way this is the reverse of [`JsonDeserializer`](#jsondeserializer), but only for a single JSON document.
+A `TransformStream<SerializableJsonValue, JsonChunk>` that emits the `JsonChunk` objects for each of the JSON values that are piped into it. The reverse of [`JsonDeserializer`](#jsondeserializer).
 
-Construct it using `new JsonSerializer(value: SerializableJsonValue, space?: string | number, strategy?: QueuingStrategy<JsonChunk>)`. It is often [piped through](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) [`JsonStringifier`](#jsonstringifier) to generate a stringified JSON stream.
+Construct it using `new JsonSerializer(space?: string | number, strategy?: QueuingStrategy<JsonChunk>)`. It is often [piped through](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) [`JsonStringifier`](#jsonstringifier) to generate a stringified JSON stream.
 
-The `SerializableJsonValue` can be any valid JSON value, that is `Record<string, JsonValue> | Array<JsonValue> | string | number | boolean | null`. In addition, for async support, any value anywhere in the JSON document can also be a `Promise<JsonValue>` or a `() => JsonValue | Promise<JsonValue>` callback instead. For streaming support, any object in the JSON document can be an object stream created by `objectStream()`, any array can be an array stream created by `arrayStream()` and any string (including property keys) can be a string stream created by `stringStream()` (for these, see [stream generators](#stream-generators)). Callbacks or promises returning these streams are also supported.
+The `SerializableJsonValue` input chunks can be any valid JSON values, that is `Record<string, JsonValue> | Array<JsonValue> | string | number | boolean | null`. In addition, for async support, any value anywhere in the JSON document can also be a `Promise<JsonValue>` or a `() => JsonValue | Promise<JsonValue>` callback instead. For streaming support, any object in the JSON document can be an object stream created by `objectStream()`, any array can be an array stream created by `arrayStream()` and any string (including property keys) can be a string stream created by `stringStream()` (for these, see [stream generators](#stream-generators)). Callbacks or promises returning these streams are also supported.
 
-As `space`, you can specify a number of indentation spaces or an indentation string, equivalent to the [space](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#space) parameter of `JSON.stringify()`. This will cause `WHITESPACE` chunks to be emitted in the appropriate places.
+As the `space` constructor argument, you can specify a number of indentation spaces or an indentation string, equivalent to the [space](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#space) parameter of `JSON.stringify()`. This will cause `WHITESPACE` chunks to be emitted in the appropriate places.
+
+##### `serializeJsonValue`
+
+`serializeJsonValue(value: SerializableJsonValue, space?: string | number): ReadableStream<JsonChunk>`
+
+For your convenience, if you want to serialize just a single JSON value, you can pass it to this function and it will pipe it through a `JsonSerializer` for you.
 
 ##### Stream generators
 

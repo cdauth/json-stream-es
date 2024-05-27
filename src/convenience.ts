@@ -1,6 +1,6 @@
 import { JsonDeserializer, type JsonValueAndPath } from "./json-deserializer";
 import { JsonParser } from "./json-parser";
-import { JsonSerializer, type SerializableJsonValue } from "./json-serializer";
+import { serializeJsonValue, type SerializableJsonValue } from "./json-serializer";
 import { JsonStringifier } from "./json-stringifier";
 import { JsonPathDetector, type JsonPath } from "./json-path-detector";
 import { JsonPathSelector, matchesJsonPathSelector, type JsonPathSelectorExpression } from "./json-path-selector";
@@ -9,7 +9,7 @@ import type { JsonValue } from "./types";
 import { AbstractTransformStream, PipeableTransformStream } from "./utils";
 
 export function stringifyJsonStream(value: SerializableJsonValue, space?: string | number): ReadableStream<string> {
-	return new JsonSerializer(value, space).pipeThrough(new JsonStringifier());
+	return serializeJsonValue(value, space).pipeThrough(new JsonStringifier());
 }
 
 class ValueExtractor extends AbstractTransformStream<JsonValueAndPath, JsonValue> {

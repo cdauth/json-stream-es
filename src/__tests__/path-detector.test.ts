@@ -1,11 +1,11 @@
 import { expect, test } from "vitest";
 import { streamToArray } from "../utils";
 import { StringRole, arrayEnd, arrayStart, colon, comma, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart } from "../types";
-import { JsonSerializer } from "../json-serializer";
+import { serializeJsonValue } from "../json-serializer";
 import { JsonPathDetector } from "../json-path-detector";
 
 test("PathDetector adds path", async () => {
-	const stream = new JsonSerializer({
+	const stream = serializeJsonValue({
 		object: {
 			array: [
 				"item1",

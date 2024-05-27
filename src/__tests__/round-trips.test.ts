@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { streamToArray, streamToString, stringToStream } from "../utils";
 import { JsonParser } from "../json-parser";
 import { JsonDeserializer } from "../json-deserializer";
-import { JsonSerializer } from "../json-serializer";
+import { serializeJsonValue } from "../json-serializer";
 import { JsonStringifier } from "../json-stringifier";
 
 const testJsonObjects = [
@@ -69,19 +69,19 @@ describe.each(testJsonObjects)("Test round trips", async (value) => {
 	});
 
 	test("JsonSerializer → JsonStringifier → JSON.parse()", async () => {
-		const stream = new JsonSerializer(value, "\t").pipeThrough(new JsonStringifier());
+		const stream = serializeJsonValue(value, "\t").pipeThrough(new JsonStringifier());
 		const result = JSON.parse(await streamToString(stream));
 		expect(result).toEqual(value);
 	});
 
 	test("JsonSerializer → JsonDeserializer", async () => {
-		const stream = new JsonSerializer(value, "\t").pipeThrough(new JsonDeserializer());
+		const stream = serializeJsonValue(value, "\t").pipeThrough(new JsonDeserializer());
 		const result = (await streamToArray(stream))[0].value;
 		expect(result).toEqual(value);
 	});
 
 	test("JsonSerializer → JsonStringifier → JsonParser → JsonDeserializer", async () => {
-		const stream = new JsonSerializer(value, "\t").pipeThrough(new JsonStringifier()).pipeThrough(new JsonParser()).pipeThrough(new JsonDeserializer());
+		const stream = serializeJsonValue(value, "\t").pipeThrough(new JsonStringifier()).pipeThrough(new JsonParser()).pipeThrough(new JsonDeserializer());
 		const result = (await streamToArray(stream))[0].value;
 		expect(result).toEqual(value);
 	});
