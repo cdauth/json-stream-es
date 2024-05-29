@@ -39,6 +39,9 @@ export class StreamSplitter<I, P extends Record<any, any> = {}> extends Transfor
 		const main = new TransformStream<[number, I], ReadableStream<I> & P>({
 			transform: ([chunkIdx, chunk], controller) => this.transformMain([chunkIdx, chunk], controller)
 		});
+		main.readable.tee = function(this: ReadableStream<ReadableStream<I> & P>): [ReadableStream<ReadableStream<I> & P>, ReadableStream<ReadableStream<I> & P>] {
+			return teeNestedStream(this);
+		};
 		Object.defineProperty(this, "readable", { get: () => main.readable, configurable: true });
 		mainInput.pipeTo(main.writable).catch(() => undefined);
 
@@ -123,4 +126,30 @@ export class StreamSplitter<I, P extends Record<any, any> = {}> extends Transfor
 			return streamKeys.length === chunkKeys.length && streamKeys.every((k) => chunkKeys.includes(k) && stream[k] === chunkProperties[k]);
 		}
 	}
+}
+
+function teeNestedStream<I, P extends Record<any, any>>(stream: ReadableStream<ReadableStream<I> & P>): [ReadableStream<ReadableStream<I> & P>, ReadableStream<ReadableStream<I> & P>] {
+	const [stream1, stream2] = stream.pipeThrough(new TransformStream({
+		transform: (chunk, controller) => {
+			const [nestedStream1, nestedStream2] = chunk.tee();
+			const nestedStreamProperties = Object.fromEntries(Object.entries(chunk));
+			controller.enqueue([
+				Object.assign(Object.create(nestedStream1), nestedStreamProperties),
+				Object.assign(Object.create(nestedStream2), nestedStreamProperties),
+			]);
+		}
+	})).tee();
+
+	return [
+		stream1.pipeThrough(new TransformStream({
+			transform: (chunk, controller) => {
+				controller.enqueue(chunk[0]);
+			}
+		})),
+		stream2.pipeThrough(new TransformStream({
+			transform: (chunk, controller) => {
+				controller.enqueue(chunk[1]);
+			}
+		}))
+	];
 }
