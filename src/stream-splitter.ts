@@ -5,7 +5,7 @@ export class StreamSplitter<I, P extends Record<any, any> = {}> extends Transfor
 	protected lastChunkIdx: number | undefined = undefined;
 
 	protected nestedStreams: Record<number, ReadableStream<I> & P> = {};
-	protected currentNestedStream: ReadableStream<I> & P | undefined = undefined;
+	protected currentNestedStream: (ReadableStream<I> & P) | undefined = undefined;
 
 	protected nestedWriters: Record<number, WritableStreamDefaultWriter<I>> = {};
 	protected currentWriter: WritableStreamDefaultWriter<I> | undefined = undefined;
@@ -21,8 +21,11 @@ export class StreamSplitter<I, P extends Record<any, any> = {}> extends Transfor
 		 * Is called for each chunk with the currently active nested stream (containing the properties created by
 		 * getNestedStreamProperties). If this returns false, the current nested stream is closed and a new nested
 		 * stream is started, with the current chunk being the first one emitted.
+		 * If not defined, getNestedStreamProperties() is called for each chunk and a new nested stream is started
+		 * whenever its result changes (compared by a shallow equality check, checking for strict equality of all
+		 * the object properties).
 		 */
-		belongsToNestedStream: (chunk: I, stream: ReadableStream<I> & P) => boolean;
+		belongsToNestedStream?: (chunk: I, stream: ReadableStream<I> & P) => boolean;
 	}, writableStrategy?: QueuingStrategy<I>, readableStrategy?: QueuingStrategy<ReadableStream<I> & P>) {
 		super({}, writableStrategy, readableStrategy);
 
@@ -101,13 +104,23 @@ export class StreamSplitter<I, P extends Record<any, any> = {}> extends Transfor
 			return;
 		}
 
-		if (!this.currentNestedStream || !this.options.belongsToNestedStream(chunk, this.currentNestedStream)) {
+		if (!this.currentNestedStream || !this.belongsToNestedStream(chunk, this.currentNestedStream)) {
 			const nestedStream = new TransformStream<I, I>();
-			this.nestedStreams[chunkIdx] = Object.assign(nestedStream.readable, this.options.getNestedStreamProperties(chunk));
+			this.nestedStreams[chunkIdx] = Object.assign(Object.create(nestedStream.readable), this.options.getNestedStreamProperties(chunk));
 			this.currentNestedStream = this.nestedStreams[chunkIdx];
 			this.nestedWriters[chunkIdx] = nestedStream.writable.getWriter();
 		}
 
 		this.lastChunkIdx = chunkIdx;
+	}
+
+	protected belongsToNestedStream(chunk: I, stream: ReadableStream<I> & P): boolean {
+		if (this.options.belongsToNestedStream) {
+			return this.options.belongsToNestedStream(chunk, stream);
+		} else {
+			const chunkProperties = this.options.getNestedStreamProperties(chunk);
+			const [streamKeys, chunkKeys] = [Object.keys(stream), Object.keys(chunkProperties)];
+			return streamKeys.length === chunkKeys.length && streamKeys.every((k) => chunkKeys.includes(k) && stream[k] === chunkProperties[k]);
+		}
 	}
 }
