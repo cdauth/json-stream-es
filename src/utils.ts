@@ -2,7 +2,7 @@
  * Converts a ReadableStream into an AsyncIterable so the stream can be consumed using "for await".
  * In the latest Streams API, ReadableStream is an AsyncIterable, but not all browsers support this yet.
  */
-export async function* streamToIterable<T>(stream: ReadableStream<T>): AsyncIterable<T> {
+export async function* streamToIterable<T>(stream: ReadableStream<T>): AsyncGenerator<T, void, undefined> {
 	const reader = stream.getReader();
 
 	try {
