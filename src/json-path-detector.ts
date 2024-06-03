@@ -56,7 +56,7 @@ export class JsonPathDetector extends AbstractTransformStream<JsonChunk, JsonChu
 			this.path.pop();
 		} else {
 			const current = this.stack[this.stack.length - 1];
-			if (current.type === "object") {
+			if (current?.type === "object") {
 				if (chunk.type === JsonChunkType.STRING_CHUNK && chunk.role === StringRole.KEY) {
 					current.key += chunk.value;
 				} else if (chunk.type === JsonChunkType.COLON) {
@@ -66,7 +66,7 @@ export class JsonPathDetector extends AbstractTransformStream<JsonChunk, JsonChu
 					current.state = "pending";
 					current.key = "";
 				}
-			} else if (current.type === "array") {
+			} else if (current?.type === "array") {
 				if (chunk.type === JsonChunkType.COMMA) {
 					current.state = "next";
 					current.key++;

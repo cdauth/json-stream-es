@@ -39,6 +39,10 @@ export type JsonValueAndPath = JsonValueAndOptionalPath<JsonChunkWithPath>;
 export class JsonDeserializer<C extends JsonChunk & { path?: JsonPath } = JsonChunkWithPath> extends AbstractTransformStream<C, JsonValueAndOptionalPath<C>> {
 	protected state: State<C> = { type: StateType.ROOT, value: undefined, path: [] };
 
+	constructor() {
+		super();
+	}
+
 	protected handleValueEnd(controller: TransformStreamDefaultController<JsonValueAndOptionalPath<C>>): void {
 		if (this.state.type === StateType.ROOT) {
 			if (this.state.value !== undefined) {

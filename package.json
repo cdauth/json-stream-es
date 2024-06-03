@@ -1,11 +1,7 @@
 {
 	"name": "json-stream-es",
-	"description": "A streaming JSON parser/stringifier using web streams.",
-	"tags": [
-		"json",
-		"stream",
-		"webstreams"
-	],
+	"description": "A streaming JSON/JSONL parser/stringifier using web streams.",
+	"keywords": ["json", "jsonl", "stream", "webstreams"],
 	"version": "1.0.0",
 	"author": "Candid Dauth <cdauth@cdauth.eu>",
 	"repository": {

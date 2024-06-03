@@ -15,6 +15,7 @@ enum StateType {
 
 /** States where the start of a new value (object/array/string/number/boolean/null) is allowed. */
 const VALUE_START_ALLOWED = [StateType.START, StateType.OBJECT_AFTER_COLON, StateType.ARRAY_AFTER_START, StateType.ARRAY_AFTER_COMMA] as const;
+const VALUE_START_ALLOWED_MULTI = [...VALUE_START_ALLOWED, StateType.END] as const;
 /** States whree the start of an object key string is allowed. */
 const KEY_START_ALLOWED = [StateType.OBJECT_AFTER_START, StateType.OBJECT_AFTER_COMMA] as const;
 /** States where a whilespace character is allowed. */
@@ -31,11 +32,11 @@ type AnyState = {
 		| StateType.OBJECT_AFTER_START | StateType.OBJECT_AFTER_KEY | StateType.OBJECT_AFTER_COLON | StateType.OBJECT_AFTER_VALUE
 		| StateType.OBJECT_AFTER_COMMA | StateType.ARRAY_AFTER_START | StateType.ARRAY_AFTER_VALUE | StateType.ARRAY_AFTER_COMMA
 	);
-	parentState: State<typeof VALUE_START_ALLOWED[number]>;
+	parentState: State<typeof VALUE_START_ALLOWED_MULTI[number]>;
 } | {
 	type: StateType.BOOLEAN_OR_NULL;
 	rawValue: string;
-	parentState: State<typeof VALUE_START_ALLOWED[number]>;
+	parentState: State<typeof VALUE_START_ALLOWED_MULTI[number]>;
 } | {
 	type: StateType.WHITESPACE;
 	rawValue: string;
@@ -46,13 +47,13 @@ type AnyState = {
 		| StateType.NUMBER_E | StateType.NUMBER_E_PLUSMINUS | StateType.NUMBER_E_DIGITS
 	);
 	rawValue: string;
-	parentState: State<typeof VALUE_START_ALLOWED[number]>;
+	parentState: State<typeof VALUE_START_ALLOWED_MULTI[number]>;
 } | {
 	type: StateType.STRING;
 	value: string;
 	rawValue: string;
 	role: StringRole;
-	parentState: State<typeof VALUE_START_ALLOWED[number] | typeof KEY_START_ALLOWED[number]>;
+	parentState: State<typeof VALUE_START_ALLOWED_MULTI[number] | typeof KEY_START_ALLOWED[number]>;
 } | {
 	type: StateType.STRING_AFTER_BACKSLASH;
 	rawValue: string;
@@ -76,8 +77,8 @@ function isState<T extends StateType>(state: State, types: readonly [...T[]]): s
  * Given the state when a value (object/array/string/number/boolean/null) was started, returns the
  * new state after the value was finished.
  */
-function getStateAfterValue(stateBeforeValue: State<typeof VALUE_START_ALLOWED[number] | typeof KEY_START_ALLOWED[number]>): State {
-	if (stateBeforeValue.type === StateType.START) {
+function getStateAfterValue(stateBeforeValue: State<typeof VALUE_START_ALLOWED_MULTI[number] | typeof KEY_START_ALLOWED[number]>): State {
+	if (isState(stateBeforeValue, [StateType.START, StateType.END])) {
 		return { ...stateBeforeValue, type: StateType.END };
 	} else if (stateBeforeValue.type === StateType.OBJECT_AFTER_COLON) {
 		return { ...stateBeforeValue, type: StateType.OBJECT_AFTER_VALUE };
@@ -130,14 +131,23 @@ const BOOLEAN_OR_NULL = { false: false, true: true, null: null };
 const BOOLEAN_OR_NULL_FIRST_CHARS = Object.keys(BOOLEAN_OR_NULL).map((k) => k[0]);
 const BOOLEAN_OR_NULL_CHARS = [...new Set(Object.keys(BOOLEAN_OR_NULL).flatMap((k) => [...k]))];
 
+export type JsonParserOptions = {
+	/** If true, the stream is allowed to contain multiple JSON values on the root level */
+	multi?: boolean;
+}
+
 /**
  * Parses a JSON string stream into a stream of JsonChunks.
- * The JSON string must contain only one JSON value (object/array/string/number/boolean/null) on the root level, otherwise
- * the stream will fail with an error.
+ * Unless multi is true, the JSON string must contain only one JSON value (object/array/string/number/boolean/null)
+ * on the root level, otherwise the stream will fail with an error.
  */
 export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 	protected state: State = { type: StateType.START };
 	protected lengthBeforeCurrentChunk = 0;
+
+	constructor(protected options: JsonParserOptions = {}) {
+		super();
+	}
 
 	/**
 	 * Checks whether a token that doesn't have an explicit end character (that is: numbers and whitespaces) has ended, and if
@@ -175,7 +185,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 
 		// Objects
 
-		if (char === "{" && isState(this.state, VALUE_START_ALLOWED)) {
+		if (char === "{" && isState(this.state, this.options.multi ? VALUE_START_ALLOWED_MULTI : VALUE_START_ALLOWED)) {
 			controller.enqueue(objectStart(char));
 			this.state = {
 				type: StateType.OBJECT_AFTER_START,
@@ -211,7 +221,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 
 		// Arrays
 
-		if (char === "[" && isState(this.state, VALUE_START_ALLOWED)) {
+		if (char === "[" && isState(this.state, this.options.multi ? VALUE_START_ALLOWED_MULTI : VALUE_START_ALLOWED)) {
 			controller.enqueue(arrayStart(char));
 			this.state = {
 				type: StateType.ARRAY_AFTER_START,
@@ -238,7 +248,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 
 		// Boolean/null
 
-		if (BOOLEAN_OR_NULL_FIRST_CHARS.includes(char) && isState(this.state, VALUE_START_ALLOWED)) {
+		if (BOOLEAN_OR_NULL_FIRST_CHARS.includes(char) && isState(this.state, this.options.multi ? VALUE_START_ALLOWED_MULTI : VALUE_START_ALLOWED)) {
 			this.state = {
 				type: StateType.BOOLEAN_OR_NULL,
 				rawValue: char,
@@ -272,7 +282,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 		// Strings
 
 		if (char === "\"") {
-			if (isState(this.state, VALUE_START_ALLOWED)) {
+			if (isState(this.state, this.options.multi ? VALUE_START_ALLOWED_MULTI : VALUE_START_ALLOWED)) {
 				controller.enqueue(stringStart(StringRole.VALUE, char));
 				this.state = {
 					type: StateType.STRING,
@@ -357,7 +367,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 
 		// Numbers
 
-		if (char === "-" && isState(this.state, VALUE_START_ALLOWED)) {
+		if (char === "-" && isState(this.state, this.options.multi ? VALUE_START_ALLOWED_MULTI : VALUE_START_ALLOWED)) {
 			this.state = {
 				type: StateType.NUMBER_MINUS,
 				rawValue: char,
@@ -426,7 +436,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 				return;
 			}
 
-			if (isState(this.state, VALUE_START_ALLOWED)) {
+			if (isState(this.state, this.options.multi ? VALUE_START_ALLOWED_MULTI : VALUE_START_ALLOWED)) {
 				this.state = {
 					type: StateType.NUMBER_DIGITS,
 					rawValue: char,
@@ -500,7 +510,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 	protected override flush(controller: TransformStreamDefaultController<JsonChunk>): void {
 		this.checkValueEnd(controller, undefined);
 
-		if (this.state.type !== StateType.END) {
+		if (this.state.type !== StateType.END && (!this.options.multi || this.state.type !== StateType.START)) {
 			throw new PrematureEndError();
 		}
 

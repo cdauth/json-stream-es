@@ -34,6 +34,30 @@ test("parseJsonStream", async () => {
 	expect(await streamToArray(stream)).toEqual(["apple1", "apple2", "cherry1", "cherry2"]);
 });
 
+test("parseJsonStream fails for multiple documents", async () => {
+	const stream = stringToStream(`"value1"\n"value2"`)
+		.pipeThrough(parseJsonStream([]));
+	await expect(async () => await streamToArray(stream)).rejects.toThrowError("Unexpected character");
+});
+
+test("parseJsonStream multi", async () => {
+	const documents = [
+		"value1",
+		2,
+		{ test3: "value3" },
+		["value4"]
+	];
+	const stream = stringToStream(documents.map((v) => JSON.stringify(v)).join("\n"))
+		.pipeThrough(parseJsonStream(undefined, { multi: true }));
+	expect(await streamToArray(stream)).toEqual(documents);
+});
+
+test("parseJsonStream multi no values", async () => {
+	const stream = stringToStream("")
+		.pipeThrough(parseJsonStream(undefined, { multi: true }));
+	expect(await streamToArray(stream)).toEqual([]);
+});
+
 test("parseJsonStreamWithPaths", async () => {
 	const stream = stringToStream(JSON.stringify(testObject))
 		.pipeThrough(parseJsonStreamWithPaths([["apples", "cherries"], "results"]));
