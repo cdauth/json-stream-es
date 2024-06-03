@@ -8,55 +8,67 @@ test.each([
 	{ space: "\t", desc: "tab" },
 	{ space: 4, desc: "4" },
 ])("JsonSerializer ($desc space)", async ({ space }) => {
-	const stream = serializeJsonValue({
-		test1: { test: 'object' },
-		test2: {
-			one: "one",
-			two: [ { object: 'one' }, { object: 'two' } ],
-			three: "three"
-		},
-		test3: objectStream(Object.entries({
-			one: "one",
-			two: arrayStream([ { object: 'one' }, { object: 'two' } ]),
-			three: "three"
-		})),
-		test4: arrayStream([
-			"one",
-			objectStream(Object.entries({ object1: "one", object2: "two" })),
-			"three"
-		]),
-		test5: stringStream(["chunk1", "chunk2"]),
-		test6: () => stringStream(["chunk1", "chunk2"]),
-		test7: Promise.resolve("promise"),
-		test8: () => Promise.resolve("promise"),
-		test9: undefined,
-		test10: () => Promise.resolve(undefined),
-		test11: "string"
-	}, space);
+	const testObject = {
+		one: "one",
+		two: "chunk1chunk2",
+		three: [{ object: 'one' }, { object: 'two' }],
+		four: { object1: "one", object2: "two" },
+		five: 4,
+		six: true,
+		seven: null,
 
-	expect(await streamToString(stream.pipeThrough(new JsonStringifier()))).toBe(JSON.stringify({
-		test1: {
-			test: "object"
-		},
-		test2: {
-			one: "one",
-			two: [{ object: "one" }, { object: "two" }],
-			three: "three"
-		},
-		test3: {
-			one: "one",
-			two: [{ object: "one" }, { object: "two" }],
-			three: "three"
-		},
-		test4: [
-			"one",
-			{ object1: "one", object2: "two" },
-			"three"
-		],
-		test5: "chunk1chunk2",
-		test6: "chunk1chunk2",
-		test7: "promise",
-		test8: "promise",
-		test11: "string"
-	}, undefined, space));
+		convert1: Object("one"),
+		convert2: Object(2),
+		convert3: Object(true),
+		convert4: Infinity,
+		convert5: NaN,
+		convert6: { toJSON: (key: string) => `six ${key}` },
+		convert7: new Date(0),
+		convert8: (JSON as any).rawJSON("12345678901234567890"),
+		convert9: 12345678901234567890,
+		convert10: (JSON as any).rawJSON("12345678901234567890"), // bigint is used below
+		convert11: (JSON as any).rawJSON("12345678901234567890"), // BigInt is used below
+
+		invalid1: undefined,
+		invalid2: Symbol(),
+		invalid3: () => undefined,
+		[Symbol()]: "invalid4"
+	};
+
+	const getTestObject = () => Object.fromEntries(Object.entries(testObject).map(([k, v]) => {
+		switch (k) {
+			case "two": return ["two", stringStream(["chunk1", "chunk2"])];
+			case "three": return ["three", arrayStream([{ object: 'one' }, { object: 'two' }])];
+			case "four": return ["four", objectStream([["object1", "one"], ["object2", "two"]])];
+			case "convert10": return ["convert10", 12345678901234567890n];
+			case "convert11": return ["convert11", Object(12345678901234567890n)];
+			default: return [k, v];
+		}
+	}));
+
+	const stream = serializeJsonValue({
+		test1: getTestObject(),
+		test2: objectStream(Object.entries(getTestObject())),
+		test3: arrayStream(Object.values(getTestObject())),
+
+		async1: () => stringStream(["chunk1", "chunk2"]),
+		async2: Promise.resolve("promise"),
+		async3: () => Promise.resolve("promise"),
+		async4: () => Promise.resolve(undefined),
+
+		...testObject
+	} as any, space);
+
+	const expectedResult = {
+		test1: testObject,
+		test2: testObject,
+		test3: Object.values(testObject),
+		async1: "chunk1chunk2",
+		async2: "promise",
+		async3: "promise",
+		async4: undefined,
+		...testObject
+	};
+
+	expect(await streamToString(stream.pipeThrough(new JsonStringifier()))).toBe(JSON.stringify(expectedResult, undefined, space));
 });

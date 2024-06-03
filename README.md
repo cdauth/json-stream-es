@@ -99,7 +99,7 @@ app.use("/api/test", (req, res) => {
 
 If you prefer the generated JSON to be indented, you can pass a number or string as the second parameter to `stringifyJsonStream()`. It will behave in the same way as the [`space` parameter of `JSON.stringify()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#space).
 
-**Note:** Other than `JSON.stringify()`, `stringifyJsonStream()` does not have any recursive object detection. Calling it with a recursive object will result in a never-ending stream.
+Please also take note of the [differences between `JSON.stringify()` and `stringifyJsonStream()`](#differences-to-jsonstringify).
 
 ### Consume a JSON stream
 
@@ -382,7 +382,14 @@ The `SerializableJsonValue` input chunks can be any valid JSON values, that is `
 
 As the `space` constructor argument, you can specify a number of indentation spaces or an indentation string, equivalent to the [space](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#space) parameter of `JSON.stringify()`. This will cause `WHITESPACE` chunks to be emitted in the appropriate places.
 
-**Note:** Other than `JSON.stringify()`, `JsonSerializer` does not have any recursive object detection. Calling it with a recursive object will result in a never-ending stream.
+##### Differences to `JSON.stringify()`
+
+`JsonSerializer` aims to mimic the behaviour of [`JSON.stringify()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify), with the following differences.
+* There is no recursive object detection. Calling it with a recursive object will result in a never-ending stream.
+* Serializing a `BigInt` will not result in an error, but the BigInt will be serialized as a number (unless `BigInt.prototype.toJSON()` is defined, which will be used instead).
+* `toJSON()` will also be called on primitives other than `bigint`.
+* While `JSON.stringify()` will ignore functions or convert them to `null`, `JsonSerializer` will call them and serialize their result.
+* When the `.toJSON(key)` method is called on an object property value whose key is a string stream, an empty string is passed as `key`.
 
 ##### `serializeJsonValue`
 
@@ -394,11 +401,11 @@ For your convenience, if you want to serialize just a single JSON value, you can
 
 To support streaming objects, arrays and strings in `JsonSerializer`, some helper functions are provided. Each of these accept an `AnyIterable<T> = Iterable<T> | AsyncIterable<T> | ReadableStream<T>` argument, so you can provide the data stream in the form of an iterator or a stream.
 
-`objectStream(stream: AnyIterable<[key: string | StringStream, value: SerializableJsonValue]>` returns a stream of object properties in the form of `[key, value]` tuples. Nested streams are supported anywhere in the value, and the key can also be a string stream returned by `stringStream()`.
+`objectStream(stream: AnyIterable<[key: string | StringStream, value: SerializableJsonValue]>)` returns a stream of object properties in the form of `[key, value]` tuples. Nested streams are supported anywhere in the values, and the keys can also be string streams returned by `stringStream()`.
 
 `arrayStream(stream: AnyIterable<SerializableJsonValue>)` returns a stream of array entries. Nested streams are supported anywhere in the entries.
 
-`stringStream(stream: AnyIterable<string>)` returns a string stream. The data source should emit string chunks.
+`stringStream(stream: AnyIterable<string>)` returns a string stream. The data source must emit string chunks.
 
 ##### Troubleshooting: `Index signature for type 'string' is missing in type`
 
@@ -408,7 +415,7 @@ interface Test {
 	test: string;
 }
 const object: Test = { test: "test" };
-new JsonSerializer(object); // Error: Index signature for type 'string' is missing in type 'Test'. ts(2345)
+serializeJsonValue(object); // Error: Index signature for type 'string' is missing in type 'Test'. ts(2345)
 ```
 
 While this seems confusing at first, TypeScript is technically right: The interface can be augmented through declaration merging, and there is no guarantee that additional properties will match the `SerializableJsonValue` type. There are different solutions to this, some of which are listed [on StackOverflow](https://stackoverflow.com/q/37006008/242365):
@@ -423,7 +430,7 @@ type InterfaceToType<T> = {
 }
 
 const object: InterfaceToType<Test> = { test: "test" };
-new JsonSerializer(object);
+serializeJsonValue(object);
 ```
 
 #### `JsonPathDetector`
@@ -434,11 +441,11 @@ The path is provided using an array of strings and numbers, where strings are ob
 
 `JsonPathSelector` can be constructed using `new JsonPathSelector(writableStrategy?: QueuingStrategy<JsonChunk>, readableStrategy?: QueuingStrategy<JsonChunkWithPath>)`.
 
-Typically, the result is piped through [`JsonPathSelector](#json-path-selector) to filter out chunks based on their path.
+Typically, the result is piped through [`JsonPathSelector`](#json-path-selector) to filter out chunks based on their path.
 
 #### `JsonPathSelector`
 
-A `TransformStream<JsonChunk & { path: Array<string | number> }, JsonChunk & { path: Array<string | number> }>` filters out the chunks that don’t match the provided path selector.
+A `TransformStream<JsonChunk & { path: Array<string | number> }, JsonChunk & { path: Array<string | number> }>` that filters out the chunks that don’t match the provided path selector.
 
 Expects an array of JSON values with paths as emitted by [`JsonPathDetector`](#jsonpathdetector).
 
@@ -482,9 +489,9 @@ A bunch of helper functions are provided to manually create `JsonChunk` objects.
 * `arrayStart()`
 * `arrayEnd()`
 * `stringStart(role = StringRole.VALUE)` (set `role` to `StringRole.KEY` for property keys)
-* `stringChunk(value: string, role = StringRole.VALUE)` (set `role` to `StringRole.KEY` for property keys)
+* `stringChunk(value: string, role = StringRole.VALUE, rawValue?: string)` (set `role` to `StringRole.KEY` for property keys)
 * `stringEnd(role = StringRole.VALUE)` (set `role` to `StringRole.KEY` for property keys)
-* `numberValue(value: number)`
+* `numberValue(value: number, rawValue?: string)`
 * `booleanValue(value: boolean)`
 * `nullValue(value: null)`
 

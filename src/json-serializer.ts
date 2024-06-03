@@ -1,5 +1,6 @@
+import { JsonParser } from "./json-parser";
 import { StringRole, arrayEnd, arrayStart, booleanValue, colon, comma, nullValue, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace, type JsonChunk } from "./types";
-import { AbstractTransformStream, iterableToStream, streamToIterable } from "./utils";
+import { AbstractTransformStream, iterableToStream, streamToIterable, stringToStream } from "./utils";
 
 type AnyIterable<T> = Iterable<T> | AsyncIterable<T> | ReadableStream<T>;
 
@@ -61,28 +62,38 @@ function normalizeSpace(space: string | number | undefined): string {
 	}
 }
 
-async function* serializeJson(value: SerializableJsonValue, space?: string | number, spacePrefix = ""): AsyncIterable<JsonChunk> {
+async function* serializeJson(value: SerializableJsonValue, space?: string | number, spacePrefix = "", key = ""): AsyncIterable<JsonChunk> {
 	const normalizedSpace = normalizeSpace(space);
-	const val = await (typeof value === "function" ? value() : value);
+	let val = await (typeof value === "function" && !("toJSON" in value) ? value() : value);
+	val = (val && "toJSON" in Object(val)) ? Object(val).toJSON(key) : val;
 
-	if (typeof val === "boolean") {
-		yield booleanValue(val);
-	} else if (typeof val === "number") {
-		yield numberValue(val);
-	} else if (typeof val === "string" || isStringStream(val)) {
+	if (typeof val === "boolean" || (typeof val === "object" && Object.prototype.toString.call(val) === "[object Boolean]")) {
+		yield booleanValue(Boolean(val));
+	} else if (typeof val === "number" || (typeof val === "object" && Object.prototype.toString.call(val) === "[object Number]")) {
+		const num = Number(val);
+		if (isFinite(num)) {
+			yield numberValue(num);
+		} else {
+			yield nullValue();
+		}
+	} else if (typeof val === "bigint" || (typeof val === "object" && Object.prototype.toString.call(val) === "[object BigInt]")) {
+		yield numberValue(Number(val), String(val));
+	} else if (typeof val === "string" || (typeof val === "object" && Object.prototype.toString.call(val) === "[object String]") || isStringStream(val)) {
 		yield stringStart();
-		for await (const chunk of isStringStream(val) ? streamToIterable(val) : [val]) {
+		for await (const chunk of isStringStream(val) ? streamToIterable(val) : [String(val)]) {
 			yield stringChunk(chunk);
 		}
 		yield stringEnd();
+	} else if ("isRawJSON" in JSON && (JSON as any).isRawJSON(val)) {
+		for await (const chunk of streamToIterable(stringToStream((val as any).rawJSON).pipeThrough(new JsonParser()))) {
+			yield chunk;
+		}
 	} else if (Array.isArray(val) || isArrayStream(val)) {
 		yield arrayStart();
 
-		let first = true;
+		let i = 0;
 		for await (const v of isArrayStream(val) ? streamToIterable(val) : val) {
-			if (first) {
-				first = false;
-			} else {
+			if (i > 0) {
 				yield comma();
 			}
 
@@ -90,12 +101,14 @@ async function* serializeJson(value: SerializableJsonValue, space?: string | num
 				yield whitespace(`\n${spacePrefix}${normalizedSpace}`);
 			}
 
-			for await (const chunk of serializeJson(v, space, `${spacePrefix}${normalizedSpace}`)) {
+			for await (const chunk of serializeJson(v, space, `${spacePrefix}${normalizedSpace}`, `${i}`)) {
 				yield chunk;
 			}
+
+			i++;
 		}
 
-		if (!first && normalizedSpace) {
+		if (i > 0 && normalizedSpace) {
 			yield whitespace(`\n${spacePrefix}`);
 		}
 
@@ -106,7 +119,7 @@ async function* serializeJson(value: SerializableJsonValue, space?: string | num
 		let first = true;
 		for await (const [k, rawV] of isObjectStream(val) ? streamToIterable(val) : Object.entries(val)) {
 			const v = await (typeof rawV === "function" ? rawV() : rawV);
-			if (v === undefined || typeof k === "symbol") {
+			if (v === undefined || typeof k === "symbol" || typeof v === "symbol") {
 				continue;
 			}
 
@@ -131,7 +144,7 @@ async function* serializeJson(value: SerializableJsonValue, space?: string | num
 				yield whitespace(" ");
 			}
 
-			for await (const chunk of serializeJson(v, space, `${spacePrefix}${normalizedSpace}`)) {
+			for await (const chunk of serializeJson(v, space, `${spacePrefix}${normalizedSpace}`, isStringStream(k) ? "" : k)) {
 				yield chunk;
 			}
 		}
