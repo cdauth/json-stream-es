@@ -17,11 +17,11 @@ export type JsonStreamWithPath = ReadableStream<JsonChunkWithPath> & P;
  * it contained an independent JSON document.
  */
 export class JsonPathStreamSplitter extends StreamSplitter<JsonChunkWithPath, P> {
-	constructor(writableStrategy?: QueuingStrategy<JsonChunkWithPath>, readableStrategy?: QueuingStrategy<JsonStreamWithPath>) {
+	constructor() {
 		super({
 			getNestedStreamProperties: (chunk) => ({ path: chunk.path }),
 			belongsToNestedStream: (chunk, stream) => arrayStartsWith(chunk.path, stream.path)
-		}, writableStrategy, readableStrategy);
+		});
 
 		const readable = this.readable.pipeThrough(new TransformStream<JsonStreamWithPath, JsonStreamWithPath>({
 			transform: (subStream, controller) => {

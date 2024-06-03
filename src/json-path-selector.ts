@@ -34,8 +34,8 @@ export function matchesJsonPathSelector(path: JsonPath, selector: JsonPathSelect
 export class JsonPathSelector extends AbstractTransformStream<JsonChunkWithPath, JsonChunkWithPath> {
 	protected currentPathPrefix: Array<string | number> | undefined = undefined;
 
-	constructor(protected selector: JsonPathSelectorExpression, writableStrategy?: QueuingStrategy<JsonChunkWithPath>, readableStrategy?: QueuingStrategy<JsonChunkWithPath>) {
-		super(writableStrategy, readableStrategy);
+	constructor(protected selector: JsonPathSelectorExpression) {
+		super();
 	}
 
 	protected override transform(chunk: JsonChunkWithPath, controller: TransformStreamDefaultController<JsonChunkWithPath>): void {

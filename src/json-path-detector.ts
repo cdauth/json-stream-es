@@ -37,8 +37,8 @@ export class JsonPathDetector extends AbstractTransformStream<JsonChunk, JsonChu
 	}> = [];
 	protected path: Array<string | number> = [];
 
-	constructor(writableStrategy?: QueuingStrategy<JsonChunk>, readableStrategy?: QueuingStrategy<JsonChunkWithPath>) {
-		super(writableStrategy, readableStrategy);
+	constructor() {
+		super();
 	}
 
 	protected override transform(chunk: JsonChunk, controller: TransformStreamDefaultController<JsonChunkWithPath>): void {

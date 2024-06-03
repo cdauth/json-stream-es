@@ -26,8 +26,8 @@ export class StreamSplitter<I, P extends Record<any, any> = {}> extends Transfor
 		 * the object properties).
 		 */
 		belongsToNestedStream?: (chunk: I, stream: ReadableStream<I> & P) => boolean;
-	}, writableStrategy?: QueuingStrategy<I>, readableStrategy?: QueuingStrategy<ReadableStream<I> & P>) {
-		super({}, writableStrategy, readableStrategy);
+	}) {
+		super({});
 
 		let chunkIdx = 0;
 		const [mainInput, nestedInput] = (this.readable as any as ReadableStream<I>).pipeThrough(new TransformStream({

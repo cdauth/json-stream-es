@@ -336,7 +336,7 @@ Like [`parseNestedJsonStream`](#parsenestedjsonstream), but the nested streams e
 
 A `TransformStream<string, JsonChunk>` that parses the incoming stringified JSON stream and emits [`JsonChunk` objects](#jsonchunk-objects) for the different tokens that the JSON document is made of.
 
-Construct one using `new JsonParser(writableStrategy?: QueuingStrategy<string>, readableStrategy?: QueuingStrategy<JsonChunk>)` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<string>`.
+Construct one using `new JsonParser()` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<string>`.
 
 Pass the output on to [`JsonPathDetector`](#jsonpathdetector), [`JsonPathSelector`](#jsonpathselector) and [`JsonDeserializer`](#jsondeserializer) to consume a JSON stream.
 
@@ -346,7 +346,7 @@ The input stream is expected to contain one valid JSON document. If the document
 
 A `TransformStream<JsonChunk, string>` that converts a stream of [`JsonChunk` objects](#jsonchunk-objects) into a stringified JSON stream. The reverse of [`JsonParser`](#jsonparser).
 
-Construct one using `new JsonStringifier(writableStrategy?: QueuingStrategy<JsonChunk>, readableStrategy?: QueuingStrategy<string>)` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<JsonChunk>`.
+Construct one using `new JsonStringifier()` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<JsonChunk>`.
 
 Use it in combination with [`JsonSerializer`](#jsonserializer) to generate JSON streams or use the [`JsonChunk` creators](#jsonchunk-creators) if you need manual control over the structure of the generated JSON document.
 
@@ -356,7 +356,7 @@ Under the hood, this stream simply emits the `rawValue` properties of the incomi
 
 A `TransformStream<JsonChunk & { path?: Array<string | number> }, { value: JsonValue; path?: Array<string | number> }>` that consumes one or more JSON values in the form of `JsonChunk` objects and converts them into JavaScript values (`JsonValue` includes all JSON-stringifiable types: objects, arrays, strings, numbers, booleans or null).
 
-Construct it using `new JsonDeserializer(writableStrategy?: QueuingStrategy<JsonChunk & { path?: Array<string | number> }>, readableStrategy?: QueuingStrategy<{ value: JsonValue; path?: Array<string | number> }>)` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<JsonChunk>`.
+Construct it using `new JsonDeserializer()` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<JsonChunk>`.
 
 Usually this is used on a stream created by [`JsonParser`](#jsonparser) and piped through [`JsonPathDetector`](#jsonpathdetector) and [`JsonPathSelector`](#jsonpathselector) to consume a JSON stream.
 
@@ -376,7 +376,7 @@ For your convenience, `deserializeJsonValue` pipes your stream to a `JsonDeseria
 
 A `TransformStream<SerializableJsonValue, JsonChunk>` that emits the `JsonChunk` objects for each of the JSON values that are piped into it. The reverse of [`JsonDeserializer`](#jsondeserializer).
 
-Construct it using `new JsonSerializer(space?: string | number, writableStrategy?: QueuingStrategy<SerializableJsonValue>, readableStrategy?: QueuingStrategy<JsonChunk>)`. It is often [piped through](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) [`JsonStringifier`](#jsonstringifier) to generate a stringified JSON stream.
+Construct it using `new JsonSerializer(space?: string | number)`. It is often [piped through](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) [`JsonStringifier`](#jsonstringifier) to generate a stringified JSON stream.
 
 The `SerializableJsonValue` input chunks can be any valid JSON values, that is `Record<string, JsonValue> | Array<JsonValue> | string | number | boolean | null`. In addition, for async support, any value anywhere in the JSON document can also be a `Promise<JsonValue>` or a `() => (JsonValue | Promise<JsonValue>)` callback instead. For streaming support, any object in the JSON document can be an object stream created by `objectStream()`, any array can be an array stream created by `arrayStream()` and any string (including property keys) can be a string stream created by `stringStream()` (for these, see [stream generators](#stream-generators)). Callbacks or promises returning these streams are also supported.
 
@@ -439,7 +439,7 @@ A `TransformStream<JsonChunk, JsonChunk & { path: Array<string | number> }>` tha
 
 The path is provided using an array of strings and numbers, where strings are object property keys and numbers are array item indexes. For example, in the JSON document `{ "key1": "value1", "key2": ["value2", "value3"] }`, the chunks of the parts `{ "key1":`, `, "key2":` and `}` would have a path `[]`, the chunks of the part ` "value1"` would have the path `["key1"]`, the chunks of the parts ` [`, `,` and `] ` would have the path `["key2"]`, the chunks of `"value2"` would have the path `["key2", 0]` and `"value3"` would have `["key2", 1]`. In other words, for objects the chunks between `:` and `,`/`}` receive a property key in the path, and for arrays the chunks between `[` and `]` except `,` receive an item index.
 
-`JsonPathSelector` can be constructed using `new JsonPathSelector(writableStrategy?: QueuingStrategy<JsonChunk>, readableStrategy?: QueuingStrategy<JsonChunkWithPath>)`.
+`JsonPathSelector` can be constructed using `new JsonPathSelector()`.
 
 Typically, the result is piped through [`JsonPathSelector`](#json-path-selector) to filter out chunks based on their path.
 
@@ -449,7 +449,7 @@ A `TransformStream<JsonChunk & { path: Array<string | number> }, JsonChunk & { p
 
 Expects an array of JSON values with paths as emitted by [`JsonPathDetector`](#jsonpathdetector).
 
-`JsonPathSelector` can be constructed using `new JsonPathSelector(selector: JsonPathSelectorExpression, writableStrategy?: QueuingStrategy<JsonChunk>, readableStrategy?: QueuingStrategy<JsonChunkWithPath>)`. It expects a [JSON path selector](#json-path-selector) expression. All chunks selected by the selector and their descendents are passed through. Notably, this behaviour is different than in the convenience functions such as [`parseJsonStream`](#parsejsonstream), where only the children of the selected objects/arrays would be passed through. If you want to select only the children of an object/array with `JsonPathSelector`, you have to use a `[...path, undefined]` selector.
+`JsonPathSelector` can be constructed using `new JsonPathSelector(selector: JsonPathSelectorExpression)`. It expects a [JSON path selector](#json-path-selector) expression. All chunks selected by the selector and their descendents are passed through. Notably, this behaviour is different than in the convenience functions such as [`parseJsonStream`](#parsejsonstream), where only the children of the selected objects/arrays would be passed through. If you want to select only the children of an object/array with `JsonPathSelector`, you have to use a `[...path, undefined]` selector.
 
 The `JsonChunk` stream emitted by `JsonPathSelector` is different from other `JsonChunk` streams in the fact that it may emit multiple JSON values on the root level. Typically, the stream is piped through [`JsonDeserializer`](#jsondeserializer) to convert it into actual JavaScript values.
 

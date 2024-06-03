@@ -163,8 +163,8 @@ async function* serializeJson(value: SerializableJsonValue, space?: string | num
  * Converts any JSON-stringifiable JavaScript values into a stream of JsonChunks.
  */
 export class JsonSerializer extends AbstractTransformStream<SerializableJsonValue, JsonChunk> {
-	constructor(protected space?: string | number, writableStrategy?: QueuingStrategy<SerializableJsonValue>, readableStrategy?: QueuingStrategy<JsonChunk>) {
-		super(writableStrategy, readableStrategy);
+	constructor(protected space?: string | number) {
+		super();
 	}
 
 	override async transform(value: SerializableJsonValue, controller: TransformStreamDefaultController<JsonChunk>): Promise<void> {
