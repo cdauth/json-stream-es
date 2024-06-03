@@ -3,3 +3,11 @@ out
 out.node
 dist
 vite.config.ts.timestamp-*.mjs
+
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions

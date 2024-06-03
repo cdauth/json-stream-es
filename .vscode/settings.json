@@ -1,3 +1,9 @@
 {
 	"jestrunner.jestCommand": "yarn vitest run",
+	"search.exclude": {
+		"**/node_modules": true,
+		"**/.yarn": true,
+		"**/dist": true,
+		"**/out": true
+	},
 }

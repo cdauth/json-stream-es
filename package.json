@@ -48,5 +48,6 @@
 		"src",
 		"README.md",
 		"LICENSE"
-	]
+	],
+	"packageManager": "yarn@4.2.2"
 }
