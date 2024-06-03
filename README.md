@@ -149,13 +149,13 @@ Sometimes you want to consume multiple objects/arrays in a JSON stream. This wou
 
 If you want to consume all apples and all cherries as a stream, the simplest way would be to use `parseJsonStreamWithPaths([["apples", "cherries"], "results"])`. This will create one stream that emits all apples and all cherries, and you would infer from each emitted value’s `path` whether a value is an apple or a cherry.
 
-json-stream-es also provides an alternative approach to consume multiple objects/arrays. [`parseJsonStreamAsSubStreams`](#parsejsonstreamassubstreams), will emit a `ReadableStream<ReadableStream<JsonValue>>`. In the above example, the stream would emit two chunks: One nested readable stream emitting all the apples, and one nested readable stream emitting all the cherries. While this approach may seem a bit excentric, it has proven to be useful in some scenarios. It also allows you to pipe the individual sub streams to different destinations.
+json-stream-es also provides an alternative approach to consume multiple objects/arrays. [`parseNestedJsonStream`](#parsenestedjsonstream) will emit a `ReadableStream<ReadableStream<JsonValue> & { path: Array<string | number> }>`. In the above example, the stream would emit two chunks: One nested readable stream emitting all the apples, and one nested readable stream emitting all the cherries. While this approach may seem a bit excentric, it has proven to be useful in some scenarios. It also allows you to pipe the individual sub streams to different destinations.
 
 Each of the nested streams gets a `path` property that indicates the path of the object/array whose properties/elements it streams.
 
 ```typescript
 const stream = res
-	.pipeThrough(parseJsonStreamAsSubStreams([["apples", "cherries"], "results"]));
+	.pipeThrough(parseNestedJsonStream([["apples", "cherries"], "results"]));
 
 for await (const subStream of streamToIterable(stream)) {
 	if (subStream.path[0] === "apples") {
@@ -166,11 +166,13 @@ for await (const subStream of streamToIterable(stream)) {
 		for await (const cherry of streamToIterable(subStream)) {
 			console.log(cherry);
 		}
+	} else {
+		subStream.cancel();
 	}
 }
 ```
 
-If you need access to the property keys inside the sub streams, you can use [`parseJsonStreamAsSubStreamsWithPaths`](#parsejsonstreamassubstreamswithpaths) instead. The resulting sub streams have their parent path prefixes removed from their paths, so in the above example, the individual apples and cherries would be emitted with paths `[0]` and `[1]`, without the `["apples", "results"]` and `["cherries", "results"]`.
+If you need access to the property keys inside the sub streams, you can use [`parseNestedJsonStreamWithPaths`](#parsenestedjsonstreamwithpaths) instead. The resulting sub streams have their parent path prefixes removed from their paths, so in the above example, the individual apples and cherries would be emitted with paths `[0]` and `[1]`, without the `["apples", "results"]` and `["cherries", "results"]`.
 
 **Note:** If you iterate over the parent stream without consuming the sub streams, the results of the sub streams will be cached in memory. If you don’t need a particular sub stream, discard it using `subStream.cancel()` (when using `break` in a stream iterator, the stream is canceled automatically).
 
@@ -308,19 +310,19 @@ Under the hood, creates a transformer chain of a [`JsonParser`](#jsonparser), [`
 
 Like [`parseJsonStream`](#parsejsonstream), but emits a stream of `{ value: JsonValue; path: Array<string | number> }` instead, where `path` is the path of object property keys and array element indexes of each value. This allows you to to access the property keys when streaming a JSON object.
 
-#### `parseJsonStreamAsSubStreams`
+#### `parseNestedJsonStream`
 
-`parseJsonStreamAsSubStreams(selector: JsonPathSelectorExpression): TransformStream<string, ReadableStream<JsonValue> & { path: JsonPath }>`
+`parseNestedJsonStream(selector: JsonPathSelectorExpression): TransformStream<string, ReadableStream<JsonValue> & { path: JsonPath }>`
 
-A convenience function to parse a stringified JSON stream, select certain arrays and/or objects return a nested stream for each of them emitting their values/elements. `selector` needs to be a [JSON path selector](#json-path-selector) that selects one or more objects/values whose values/elements should be streamed.
+A convenience function to parse a stringified JSON stream, select certain arrays and/or objects emit a nested stream for each of them emitting their values/elements. `selector` needs to be a [JSON path selector](#json-path-selector) that selects one or more objects/values whose values/elements should be streamed.
 
-Under the hood, creates a transformer chain of a [`JsonParser`](#jsonparser), [`JsonPathDetector`](#jsonpathdetector), [`JsonPathSelector`](#jsonpathselector) and [`JsonPathStreamSplitter`](#jsonpathstreamsplitter), and then pipes each sub stream through[`JsonDeserializer`](#jsondeserializer).
+Under the hood, creates a transformer chain of a [`JsonParser`](#jsonparser), [`JsonPathDetector`](#jsonpathdetector), [`JsonPathSelector`](#jsonpathselector) and [`JsonPathStreamSplitter`](#jsonpathstreamsplitter), and then pipes each sub stream through [`JsonDeserializer`](#jsondeserializer).
 
-#### `parseJsonStreamAsSubStreamsWithPaths`
+#### `parseNestedJsonStreamWithPaths`
 
-`parseJsonStreamAsSubStreamsWithPaths(selector: JsonPathSelectorExpression): TransformStream<string, ReadableStream<{ value: JsonValue; path: Array<string | number> }> & { path: JsonPath }>`
+`parseNestedJsonStreamWithPaths(selector: JsonPathSelectorExpression): TransformStream<string, ReadableStream<{ value: JsonValue; path: Array<string | number> }> & { path: Array<string, number> }>`
 
-Like [`parseJsonStreamAsSubStreams`](#parsejsonstreamassubstreams), but the nested streams emit `{ value: JsonValue; path: Array<string | number> }` instead, where `path` is the path of object property keys and array element indexes of each value. In the sub streams, the paths have the path prefix of their containing streamed object/array removed.
+Like [`parseNestedJsonStream`](#parsenestedjsonstream), but the nested streams emit `{ value: JsonValue; path: Array<string | number> }` instead, where `path` is the path of object property keys and array element indexes of each value. In the sub streams, the paths have the path prefix of their containing streamed object/array removed.
 
 ### Stream transformers
 

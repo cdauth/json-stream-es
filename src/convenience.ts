@@ -40,7 +40,7 @@ export function parseJsonStream(
 	});
 }
 
-export function parseJsonStreamAsSubStreamsWithPaths(
+export function parseNestedJsonStreamWithPaths(
 	selector: JsonPathSelectorExpression
 ): TransformStream<string, ReadableStream<JsonValueAndPath> & { path: JsonPath }> {
 	return new PipeableTransformStream((readable) => {
@@ -62,12 +62,12 @@ export function parseJsonStreamAsSubStreamsWithPaths(
 	});
 }
 
-export function parseJsonStreamAsSubStreams(
+export function parseNestedJsonStream(
 	selector: JsonPathSelectorExpression
 ): TransformStream<string, ReadableStream<JsonValue> & { path: JsonPath }> {
 	return new PipeableTransformStream((readable) => {
 		return readable
-			.pipeThrough(parseJsonStreamAsSubStreamsWithPaths(selector))
+			.pipeThrough(parseNestedJsonStreamWithPaths(selector))
 			.pipeThrough(new TransformStream({
 				transform: (chunk, controller) => {
 					controller.enqueue(Object.assign(

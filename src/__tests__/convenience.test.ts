@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { stringifyJsonStream, parseJsonStream, parseJsonStreamAsSubStreams, parseJsonStreamAsSubStreamsWithPaths, parseJsonStreamWithPaths } from "../convenience";
+import { stringifyJsonStream, parseJsonStream, parseNestedJsonStream, parseNestedJsonStreamWithPaths, parseJsonStreamWithPaths } from "../convenience";
 import { arrayStream, objectStream } from "../json-serializer";
 import { streamToArray, streamToIterable, streamToString, stringToStream } from "../utils";
 import type { JsonPath } from "../json-path-detector";
@@ -45,9 +45,9 @@ test("parseJsonStreamWithPaths", async () => {
 	]);
 });
 
-test("parseJsonStreamAsSubStreams", async () => {
+test("parseNestedJsonStream", async () => {
 	const stream = stringToStream(JSON.stringify(testObject))
-		.pipeThrough(parseJsonStreamAsSubStreams([["apples", "cherries"], "results"]));
+		.pipeThrough(parseNestedJsonStream([["apples", "cherries"], "results"]));
 
 	let results: Array<{ path: JsonPath; chunks: any[] }> = [];
 	for await (const subStream of streamToIterable(stream)) {
@@ -69,9 +69,9 @@ test("parseJsonStreamAsSubStreams", async () => {
 	]);
 });
 
-test("parseJsonStreamAsSubStreamsWithPaths", async () => {
+test("parseNestedJsonStreamWithPaths", async () => {
 	const stream = stringToStream(JSON.stringify(testObject))
-		.pipeThrough(parseJsonStreamAsSubStreamsWithPaths([["apples", "cherries"], "results"]));
+		.pipeThrough(parseNestedJsonStreamWithPaths([["apples", "cherries"], "results"]));
 
 	let results: Array<{ path: JsonPath; chunks: any[] }> = [];
 	for await (const subStream of streamToIterable(stream)) {
