@@ -1,6 +1,6 @@
 # json-stream-es
 
-json-stream-es is a modern library that provides a streaming alternative to [`JSON.parse()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse) and [`JSON.stringify()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify). It is published as an ECMAScript Module (ESM) and uses the new [Streams API](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) (in particular [`TransformStream`s](https://developer.mozilla.org/en-US/docs/Web/API/TransformStream)), and thus should work in the browser, in Node.js and in any other modern JavaScript environment.
+json-stream-es is a modern JavaScript library that provides a streaming alternative to [`JSON.parse()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse) and [`JSON.stringify()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify). It is published as an ECMAScript Module (ESM) and uses the new [Streams API](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) (in particular [`TransformStream`s](https://developer.mozilla.org/en-US/docs/Web/API/TransformStream)), and thus should work in the browser, in Node.js and in any other modern JavaScript environment.
 
 When implementing a web service in the backend (for example a REST API), streaming JSON has the advantage that the data arrives to the user faster (because the web service doesn’t have to wait for all data to be loaded from the database before it can start sending it), and that memory consumption is greatly reduced (because the service only needs to keep small chunks of the data in memory before passing it on to the user).
 
@@ -12,9 +12,9 @@ json-stream-es is available through [NPM](https://www.npmjs.com/package/json-str
 
 json-stream-es relies on the [Streams API](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) being available as global objects. When used in the backend, it thus requires Node.js >= 18 or a polyfill. In browsers, this API has been widely available since June 2022. If you need to support older browsers, a polyfill is required.
 
-json-stream-es is published as an ECMAScript module. If you want to use it in a Node.js project that still uses CommonJS, you need to use [dynamic `import()`](https://nodejs.org/api/esm.html#import-statements) to import the library, `require()` is not supported.
+json-stream-es is published as an ECMAScript module. If you want to use it in a Node.js project that still uses CommonJS, you need to use [dynamic `import()`](https://nodejs.org/api/esm.html#import-statements) to import the library; `require()` is not supported.
 
-To use the library in a web app that does not use a bundler, (not recommended in production), one way would be to import it from esm.sh:
+To use the library in a web app that does not use a bundler (not recommended in production), one way would be to import it from esm.sh:
 ```html
 <script type="importmap">
 	{
@@ -63,12 +63,12 @@ async function* generateString(value) {
 
 async function* generateObject() {
 	yield ["property1", "value1"];
-	yield [generateString("property2"), generateString("value2")];
+	yield [stringStream(generateString("property2")), stringStream(generateString("value2"))];
 }
 
 async function* generateArray() {
 	yield "value1";
-	yield generateString("value2");
+	yield stringStream(generateString("value2"));
 }
 
 const jsonStream = stringifyJsonStream({
@@ -98,6 +98,8 @@ app.use("/api/test", (req, res) => {
 ```
 
 If you prefer the generated JSON to be indented, you can pass a number or string as the second parameter to `stringifyJsonStream()`. It will behave in the same way as the [`space` parameter of `JSON.stringify()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#space).
+
+**Note:** Other than `JSON.stringify()`, `stringifyJsonStream()` does not have any recursive object detection. Calling it with a recursive object will result in a never-ending stream.
 
 ### Consume a JSON stream
 
@@ -129,7 +131,7 @@ If you need access to not just the object property values, but also their keys, 
 
 #### Consuming multiple objects/arrays
 
-Sometimes you want to consume multiple objects/arrays in a JSON stream. This would be an example JSON documents:
+Sometimes you want to consume multiple objects/arrays in a JSON stream. This would be an example JSON document:
 ```json
 {
 	"apples": {
@@ -151,7 +153,7 @@ If you want to consume all apples and all cherries as a stream, the simplest way
 
 json-stream-es also provides an alternative approach to consume multiple objects/arrays. [`parseNestedJsonStream`](#parsenestedjsonstream) will emit a `ReadableStream<ReadableStream<JsonValue> & { path: Array<string | number> }>`. In the above example, the stream would emit two chunks: One nested readable stream emitting all the apples, and one nested readable stream emitting all the cherries. While this approach may seem a bit excentric, it has proven to be useful in some scenarios. It also allows you to pipe the individual sub streams to different destinations.
 
-Each of the nested streams gets a `path` property that indicates the path of the object/array whose properties/elements it streams.
+Each of the nested streams has a `path` property that indicates the path of the object/array whose properties/elements it streams.
 
 ```typescript
 const stream = res
@@ -180,13 +182,13 @@ If you need access to the property keys inside the sub streams, you can use [`pa
 
 ### Architecture
 
-At its core, json-stream-es handles 3 types of JSON documents:
+At its core, json-stream-es handles 3 representations of JSON documents:
 * A `ReadableStream<string>` is a streamed stringified JSON document
-* A `ReadableStream<JsonChunk>` is an internal representation of a JSON document, where each [`JsonChunk`](#jsonchunk-objects) represents a section of the document
 * A `JsonValue` is a JavaScript value that can be stringified to JSON (in particular `{ [key: string]: JsonValue } | Array<JsonValue> | string | number | boolean | null`).
+* A `ReadableStream<JsonChunk>` is an internal representation of a JSON document, where each [`JsonChunk`](#jsonchunk-objects) represents a section of the document
 
 The main features of json-stream-es are:
-* Provide converters to convert between the 3 types of JSON documents:
+* Provide converters to convert between the 3 representations of JSON documents:
 	* [`JsonParser`](#jsonparser) (`ReadableStream<string>` → `ReadableStream<JsonChunk>`)
 	* [`JsonStringifier`](#jsonstringifier) (`ReadableStream<JsonChunk>` → `ReadableStream<string>`)
 	* [`JsonDeserializer`](#jsondeserializer) (`ReadableStream<JsonChunk>` → `JsonValue`)
@@ -196,6 +198,10 @@ The main features of json-stream-es are:
 	* [`JsonPathSelector`](#jsonpathselector) to filter out values nested in objects/arrays based on their path
 	* [`JsonPathStreamSplitter`](#jsonpathstreamsplitter) to split a stream of JSON values into a stream of sub streams for the values under different paths
 	* [`JsonChunk` creators](#jsonchunk-creators) to create a stream of `JsonChunk`s by hand
+* Provide convenience functions for common combinations of the above:
+	* [`stringifyJsonStream`](#stringifyjsonstream), combining `JsonSerializer` and `JsonStringifier`
+	* [`parseJsonStream`](#parsejsonstream) and [`parseJsonStreamWithPaths`](#parsejsonstreamwithpaths), combining `JsonParser`, `JsonPathDetector`, `JsonPathSelector` and `JsonDeserializer`
+	* [`parseNestedJsonStream`](#parsenestedjsonstream) and [`parseNestedJsonStreamWithPaths`](#parsenestedjsonstreamwithpaths), combining `JsonParser`, `JsonPathDetector`, `JsonPathSelector`, `JsonPathStreamSplitter` and `JsonDeserializer`.
 
 ### `JsonChunk` objects
 
@@ -274,7 +280,7 @@ Some methods expect a JSON path selector to pick only some values from the JSON 
 In this example JSON document, the following selectors would select the following values:
 * `[]`: The root object itself
 * `["array"]`: The array of two items
-* `["array", 1]`: `"item2"
+* `["array", 1]`: `"item2"`
 * `["array", undefined]`: `"item1"` and `"item2"`
 * `["array", [0, 1]]`: `"item1"` and `"item2"`
 
@@ -332,7 +338,7 @@ A `TransformStream<string, JsonChunk>` that parses the incoming stringified JSON
 
 Construct one using `new JsonParser(writableStrategy?: QueuingStrategy<string>, readableStrategy?: QueuingStrategy<JsonChunk>)` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<string>`.
 
-Pass the output on to [`JsonPathSelector`](#jsonpathselector) and [`JsonDeserializer`](#jsondeserializer) to consume a JSON stream.
+Pass the output on to [`JsonPathDetector`](#jsonpathdetector), [`JsonPathSelector`](#jsonpathselector) and [`JsonDeserializer`](#jsondeserializer) to consume a JSON stream.
 
 The input stream is expected to contain one valid JSON document. If the document is invalid or the input stream contains zero or multiple documents, the stream aborts with an error. This also means that you can rely on the order of the emitted `JsonChunk` objects to be valid (for example, when a `JsonChunkType.STRING_CHUNK` object is emitted, you can be sure that it was preceded b a `JsonChunkType.STRING_START` object).
 
@@ -348,11 +354,13 @@ Under the hood, this stream simply emits the `rawValue` properties of the incomi
 
 #### `JsonDeserializer`
 
-A `TransformStream<JsonChunk, { value: JsonValue; path?: Array<string | number> }>` that consumes one or more JSON values in the form of `JsonChunk` objects and converts them into JavaScript values (`JsonValue` includes all JSON-stringifiable types: objects, arrays, strings, numbers, booleans or null).
+A `TransformStream<JsonChunk & { path?: Array<string | number> }, { value: JsonValue; path?: Array<string | number> }>` that consumes one or more JSON values in the form of `JsonChunk` objects and converts them into JavaScript values (`JsonValue` includes all JSON-stringifiable types: objects, arrays, strings, numbers, booleans or null).
 
-Construct it using `new JsonDeserializer(writableStrategy?: QueuingStrategy<JsonChunk>, readableStrategy?: QueuingStrategy<string>)` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<JsonChunk>`.
+Construct it using `new JsonDeserializer(writableStrategy?: QueuingStrategy<JsonChunk & { path?: Array<string | number> }>, readableStrategy?: QueuingStrategy<{ value: JsonValue; path?: Array<string | number> }>)` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<JsonChunk>`.
 
-Usually this is used on a stream created by [`JsonParser`](#jsonparser) and piped through [`JsonPathSelector`](#jsonpathselector) to consume a JSON stream.
+Usually this is used on a stream created by [`JsonParser`](#jsonparser) and piped through [`JsonPathDetector`](#jsonpathdetector) and [`JsonPathSelector`](#jsonpathselector) to consume a JSON stream.
+
+If the `JsonChunk` objects of the (readable) input stream contain a `path` property, each emitted object gets a `path` property that is a copy of the `path` of its first chunk.
 
 Note that the stream does not check the validity of the incoming `JsonChunk` objects. If you pass in chunks in an order that does not make sense, the stream will produce unpredictable output.
 
@@ -360,7 +368,7 @@ Note that the stream does not check the validity of the incoming `JsonChunk` obj
 
 `deserializeJsonValue(stream: ReadableStream<JsonChunk>): Promise<JsonValue>`
 
-Sometimes, your `ReadableStream<JsonChunk>` may contain only one JSON value that you want to decode. A typical scenario for this is a nested stream created by [`JsonPathStreamSplitter`](#jsonpathstreamsplitter) where a sub stream contains only one value.
+Sometimes, your `ReadableStream<JsonChunk>` may contain only one JSON value that you want to decode. A possible scenario for this is a nested stream created by [`JsonPathStreamSplitter`](#jsonpathstreamsplitter) where a sub stream contains only one value.
 
 For your convenience, `deserializeJsonValue` pipes your stream to a `JsonDeserializer` and returns the JSON value emitted by it. If your stream contains more or less than 1 JSON value, an error is thrown.
 
@@ -368,11 +376,13 @@ For your convenience, `deserializeJsonValue` pipes your stream to a `JsonDeseria
 
 A `TransformStream<SerializableJsonValue, JsonChunk>` that emits the `JsonChunk` objects for each of the JSON values that are piped into it. The reverse of [`JsonDeserializer`](#jsondeserializer).
 
-Construct it using `new JsonSerializer(space?: string | number, strategy?: QueuingStrategy<JsonChunk>)`. It is often [piped through](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) [`JsonStringifier`](#jsonstringifier) to generate a stringified JSON stream.
+Construct it using `new JsonSerializer(space?: string | number, writableStrategy?: QueuingStrategy<SerializableJsonValue>, readableStrategy?: QueuingStrategy<JsonChunk>)`. It is often [piped through](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) [`JsonStringifier`](#jsonstringifier) to generate a stringified JSON stream.
 
-The `SerializableJsonValue` input chunks can be any valid JSON values, that is `Record<string, JsonValue> | Array<JsonValue> | string | number | boolean | null`. In addition, for async support, any value anywhere in the JSON document can also be a `Promise<JsonValue>` or a `() => JsonValue | Promise<JsonValue>` callback instead. For streaming support, any object in the JSON document can be an object stream created by `objectStream()`, any array can be an array stream created by `arrayStream()` and any string (including property keys) can be a string stream created by `stringStream()` (for these, see [stream generators](#stream-generators)). Callbacks or promises returning these streams are also supported.
+The `SerializableJsonValue` input chunks can be any valid JSON values, that is `Record<string, JsonValue> | Array<JsonValue> | string | number | boolean | null`. In addition, for async support, any value anywhere in the JSON document can also be a `Promise<JsonValue>` or a `() => (JsonValue | Promise<JsonValue>)` callback instead. For streaming support, any object in the JSON document can be an object stream created by `objectStream()`, any array can be an array stream created by `arrayStream()` and any string (including property keys) can be a string stream created by `stringStream()` (for these, see [stream generators](#stream-generators)). Callbacks or promises returning these streams are also supported.
 
 As the `space` constructor argument, you can specify a number of indentation spaces or an indentation string, equivalent to the [space](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#space) parameter of `JSON.stringify()`. This will cause `WHITESPACE` chunks to be emitted in the appropriate places.
+
+**Note:** Other than `JSON.stringify()`, `JsonSerializer` does not have any recursive object detection. Calling it with a recursive object will result in a never-ending stream.
 
 ##### `serializeJsonValue`
 
