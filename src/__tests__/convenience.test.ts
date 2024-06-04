@@ -47,7 +47,7 @@ test("parseJsonStream multi", async () => {
 		{ test3: "value3" },
 		["value4"]
 	];
-	const stream = stringToStream(documents.map((v) => JSON.stringify(v)).join("\n"))
+	const stream = stringToStream(documents.map((v) => `\x1e${JSON.stringify(v)}`).join("\n"))
 		.pipeThrough(parseJsonStream(undefined, { multi: true }));
 	expect(await streamToArray(stream)).toEqual(documents);
 });

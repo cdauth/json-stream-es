@@ -1,10 +1,56 @@
 # json-stream-es
 
-json-stream-es is a modern JavaScript library that provides a streaming alternative to [`JSON.parse()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse) and [`JSON.stringify()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify). It is published as an ECMAScript Module (ESM) and uses the new [Streams API](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) (in particular [`TransformStream`s](https://developer.mozilla.org/en-US/docs/Web/API/TransformStream)), and thus should work in the browser, in Node.js and in any other modern JavaScript environment.
+json-stream-es is a modern JavaScript library that provides a streaming alternative to [`JSON.parse()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse) and [`JSON.stringify()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify). It is published as an ECMAScript Module (ESM) and uses the new [Streams API](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) (in particular [`TransformStream`s](https://developer.mozilla.org/en-US/docs/Web/API/TransformStream)), and thus should work in the browser, in Node.js and in any other modern JavaScript environment. json-stream-es also supports various types of [JSON streaming](https://en.wikipedia.org/wiki/JSON_streaming), in particular generating/consuming multiple JSON documents separated by newlines ([JSONL](https://jsonlines.org/)), record separators ([JSON-seq](https://www.rfc-editor.org/rfc/rfc7464.html)) or no delimiter.
 
 When implementing a web service in the backend (for example a REST API), streaming JSON has the advantage that the data arrives to the user faster (because the web service doesn’t have to wait for all data to be loaded from the database before it can start sending it), and that memory consumption is greatly reduced (because the service only needs to keep small chunks of the data in memory before passing it on to the user).
 
 When consuming a web service from the frontend, streaming JSON has the advantage that you can display the partial data as it loads, and that memory consumption is reduced if you only intend to consume parts of the retrieved data.
+
+## Terminology
+
+* A **JSON value** is a value that is permitted inside a JSON document, in particular `Record<string, JsonValue> | Array<JsonValue> | string | number | boolean | null`.
+* A **JSON document** is a JSON value that appears on the root level. The JSON standard only allows one value on the root level, but there are variations of the standard that allow multiple JSON documents within the same file.
+
+## Table of contents
+
+* [Installation and requirements](#installation-and-requirements)
+* [Usage](#usage)
+	* [Generate a JSON stream](#generate-a-json-stream)
+		* [Emitting multiple JSON documents](#emitting-multiple-json-documents)
+	* [Consume a JSON stream](#consume-a-json-stream)
+		* [Getting object keys](#getting-object-keys)
+		* [Consuming a stream of multiple JSON documents](#consuming-a-stream-of-multiple-json-documents)
+		* [Consuming multiple nested arrays/objects](#consuming-multiple-nested-objectsarrays)
+* [Concepts](#concepts)
+	* [Architecture](#architecture)
+	* [`JsonChunk` objects](#jsonchunk-objects)
+	* [JSON path selector](#json-path-selector)
+* [API](#api)
+	* [Convenience functions](#convenience-functions)
+		* [`stringifyJsonStream`](#stringifyjsonstream) – Transforms a single JSON document into a stringified JSON stream
+		* [`stringifyMultiJsonStream`](#stringifymultijsonstream) – Transforms multiple JSON documents into a stringified JSON stream
+		* [`parseJsonStream`](#parsejsonstream) – Parses a stringified JSON stream and picks certain values from it
+		* [`parseJsonStreamWithPaths`](#parsejsonstreamwithpaths) – Parses a stringified JSON stream and picks certain values and their paths from it
+		* [`parseNestedJsonStream`](#parsenestedjsonstream) – Parses a stringified JSON stream, picks certain objects/arrays from it and emits their values/elements as nested streams.
+		* [`parseNestedJsonStreamWithPaths`](#parsenestedjsonstreamwithpaths) – Parses a stringified JSON stream, picks certain objects/arrays from it and emits their values/elements and paths as nested streams.
+	* [Stream transformers](#stream-transformers)
+		* [`JsonParser`](#jsonparser) – Transforms a stringified JSON stream into a stream of `JsonChunk` objects
+		* [`JsonStringifier`](#jsonstringifier) – Transforms a stream of `JsonChunk` objects into a stringified JSON stream
+		* [`JsonDeserializer`](#jsondeserializer) – Transforms a stream of `JsonChunk` objects into a stream of JSON values
+			* [`deserializeJsonValue`](#deserializejsonvalue) – Transforms a stream of `JsonChunk` objects into a single JSON value
+		* [`JsonSerializer`](#jsonserializer) – Transforms a stream of JSON values into a stream of `JsonChunk` objects
+			* [Differences to `JSON.stringify()`](#differences-to-jsonstringify)
+			* [`serializeJsonValue`](#serializejsonvalue) – Transforms a single JSON value into a stream of `JsonChunk` objects
+			* [Stream generators](#stream-generators) – Helper functions to generate streamed objects/arrays/strins inside JSON values
+			* [Troubleshooting: `Index signature for type 'string' is missing in type`](#troubleshooting-index-signature-for-type-string-is-missing-in-type)
+		* [`JsonPathDetector`](#jsonpathdetector) – Calculates each value’s path in the hierarchy of objects/arrays.
+		* [`JsonPathSelector`](#jsonpathselector) – Picks only values under a certain path in the hierarchy of objects/arrays.
+		* [`JsonPathStreamSplitter`](#jsonpathstreamsplitter) – Splits a stream of JSON values into a stream of nested streams
+	* [Utils](#utils)
+		* [`matchesJsonPathSelector`](#matchesjsonpathselector) – Tests if a JSON path matches a JSON path selector
+		* [`JsonChunk` creators](#jsonchunk-creators) – Helper functoins to manually create `JsonChunk` objects
+		* [`streamToIterable`](#streamtoiterable) – Convert a `ReadableStream` to an `AsyncIterable`
+* [Acknowledgements](#acknowledgements)
 
 ## Installation and requirements
 
@@ -97,13 +143,13 @@ app.use("/api/test", (req, res) => {
 });
 ```
 
-If you prefer the generated JSON to be indented, you can pass a number or string as the second parameter to `stringifyJsonStream()`. It will behave in the same way as the [`space` parameter of `JSON.stringify()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#space).
+If you prefer the generated JSON to be indented, you can pass a number or string as the first parameter of `stringifyJsonStream()`. It will behave in the same way as the [`space` parameter of `JSON.stringify()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#space).
 
 Please also take note of the [differences between `JSON.stringify()` and `stringifyJsonStream()`](#differences-to-jsonstringify).
 
-#### Emitting multiple JSON values (JSONL)
+#### Emitting multiple JSON documents
 
-The [JSON Lines](https://jsonlines.org/) standard is a variation of JSON that allows multiple JSON values on the root level, separated by newlines. To emit such a stream, use the [`stringifyMultiJsonStream`](#stringifymultijsonstream) function, which returns a `TransformStream<JsonValue, string>`:
+While the JSON standard only allows one JSON document per file, there are various variations of it to stream multiple documents. To emit such a stream, use the [`stringifyMultiJsonStream`](#stringifymultijsonstream) function, which returns a `TransformStream<JsonValue, string>`:
 ```typescript
 import { stringifyMultiJsonStream } from "json-stream-es";
 
@@ -119,6 +165,8 @@ iterableToStream(values)
 ```
 
 The individual values may also contain object/array/string streams like in the examples above.
+
+By default, the individual JSON objects are separated by a newline, fulfilling the [JSON Lines](https://jsonlines.org/) standard (also known as JSONL, NDJSON, LDJSON). You can pass a `{ beforeFirst?: string; delimiter?: string; afterLast?: string }` object as the second parameter of `stringifyMultiJsonStream(space, options)` to define custom delimiter white spaces (`delimiter` defaults to `\n`). For [JSON-seq](https://www.rfc-editor.org/rfc/rfc7464.html), use `{ beforeFirst: "\x1e", delimiter: "\n\x1e", afterLast: "\n" }`.
 
 ### Consume a JSON stream
 
@@ -148,16 +196,16 @@ If you need access to not just the object property values, but also their keys, 
 * `{ value: { test: "value1" }, path: ["results", 0] }`
 * `{ value: "value2", path: ["results", 1] }`
 
-#### Consuming multiple JSON values (JSONL)
+#### Consuming a stream of multiple JSON documents
 
-The [JSON Lines](https://jsonlines.org/) standard is a variation of JSON that allows multiple JSON values on the root level, separated by newlines. To consume such a stream, pass a `multi: true` option, which will make `parseJsonStream` accept input streams with zero or multiple root values:
+While the JSON standard allows only one JSON document per file, there are various variations of the standard that allow zero or multiple documents. In particular, there are JSONL/NDJSON/LDJSON (JSON documents separated by newlines), JSON-seq (JSON documents separated by `0x1E` record separator characters) and concatenated JSON (multiple JSON documents without a separator). Since json-stream-es parses the whole JSON document, it can support all of these and simply ignores the delimiter white spaces. When you pass `multi: true` to `parseJsonStream`, it will accept input streams with zero or multiple JSON documents (and additionally ignore `0x1E` in between JSON documents in addition to the whitespaces allowed in the JSON standard):
 ```typescript
 const stream = res
 	.pipeThrough(new TextDecoderStream())
 	.pipeThrough(parseJsonStream(undefined, { multi: true }));
 ```
 
-By using `undefined` as the path selector will select the root values themselves rather than their properties/elements.
+Using `undefined` as the path selector will select the root values themselves rather than their properties/elements.
 
 #### Consuming multiple nested objects/arrays
 
@@ -221,8 +269,8 @@ The main features of json-stream-es are:
 * Provide converters to convert between the 3 representations of JSON documents:
 	* [`JsonParser`](#jsonparser) (`ReadableStream<string>` → `ReadableStream<JsonChunk>`)
 	* [`JsonStringifier`](#jsonstringifier) (`ReadableStream<JsonChunk>` → `ReadableStream<string>`)
-	* [`JsonDeserializer`](#jsondeserializer) (`ReadableStream<JsonChunk>` → `JsonValue`)
-	* [`JsonSerializer`](#jsonserializer) (`JsonValue` → `ReadableStream<JsonChunk>`)
+	* [`JsonDeserializer`](#jsondeserializer) (`ReadableStream<JsonChunk>` → `ReadableStream<JsonValue>`)
+	* [`JsonSerializer`](#jsonserializer) (`ReadableStream<JsonValue>` → `ReadableStream<JsonChunk>`)
 * Provide helpers to generate, analyze and modify a `ReadableStream<JsonChunk>`:
 	* [`JsonPathDetector`](#jsonpathdetector) to detect the property key path for values nested in objects/arrays
 	* [`JsonPathSelector`](#jsonpathselector) to filter out values nested in objects/arrays based on their path
@@ -332,19 +380,25 @@ stream.pipeThrough(parseJsonStream((path) => (
 
 A convenience function to serialize a JSON value into a stringified JSON stream. Under the hood, it creates a [`JsonSerializer`](#jsonserializer) and pipes it through a [`JsonStringifier`](#jsonstringifier). See those for details.
 
+Also see [Generate a JSON stream](#generate-a-json-stream) for usage instructions.
+
 #### `stringifyMultiJsonStream`
 
-`stringifyMultiJsonStream(space?: string | number): TransformStream<SerializableJsonValue, string>`
+`stringifyMultiJsonStream(space?: string | number, delimiter?: string): TransformStream<SerializableJsonValue, string>`
 
-Returns a transform stream that accepts zero or more serializable JSON values and emits a stringified JSON stream. Can be used to create a JSON stream that contains multiple values on the root level. Under the hood, it creates a transformer chain of a [`JsonSerializer`](#jsonserializer) and a [`JsonStringifier`](#jsonstringifier). See those for details.
+Returns a transform stream that accepts zero or more serializable JSON values and emits a stringified JSON stream. Can be used to create a JSON stream that contains multiple JSON documents. Under the hood, it creates a transformer chain of a [`JsonSerializer`](#jsonserializer) and a [`JsonStringifier`](#jsonstringifier). See those for details.
+
+Also see [Emitting multiple JSON documents](#emitting-multiple-json-documents) for usage instructions.
 
 #### `parseJsonStream`
 
 `parseJsonStream(selector: JsonPathSelectorExpression | undefined, options?: { multi?: boolean }): TransformStream<string, JsonValue>`
 
-A convenience function to parse a stringified JSON stream, select certain arrays and/or objects from it and stream their values/elements. `selector` needs to be a [JSON path selector](#json-path-selector) that selects one or more objects/values whose values/elements should be streamed. If `multi` is true, no error will be thrown if the input contains zero or more than one JSON values on the root level. For multi streams, `selector` can undefined to select the root values themselves.
+A convenience function to parse a stringified JSON stream, select certain arrays and/or objects from it and stream their values/elements. `selector` needs to be a [JSON path selector](#json-path-selector) that selects one or more objects/values whose values/elements should be streamed. If `multi` is true, no error will be thrown if the input contains zero or more than one JSON documents. For multi streams, `selector` can undefined to select the root values themselves. In `multi` mode, `0x1E` (record separater) characters in between JSON documents are ignored to support JSON-seq.
 
 Under the hood, creates a transformer chain of a [`JsonParser`](#jsonparser), [`JsonPathDetector`](#jsonpathdetector), [`JsonPathSelector`](#jsonpathselector) and [`JsonDeserializer`](#jsondeserializer), see those for details.
+
+Also see [Consume a JSON stream](#consume-a-json-stream) for usage instructions.
 
 #### `parseJsonStreamWithPaths`
 
@@ -352,13 +406,17 @@ Under the hood, creates a transformer chain of a [`JsonParser`](#jsonparser), [`
 
 Like [`parseJsonStream`](#parsejsonstream), but emits a stream of `{ value: JsonValue; path: Array<string | number> }` instead, where `path` is the path of object property keys and array element indexes of each value. This allows you to to access the property keys when streaming a JSON object.
 
+Also see [Getting object keys](#getting-object-keys) for usage instructions.
+
 #### `parseNestedJsonStream`
 
 `parseNestedJsonStream(selector: JsonPathSelectorExpression | undefined, options?: { multi?: boolean }): TransformStream<string, ReadableStream<JsonValue> & { path: JsonPath }>`
 
-A convenience function to parse a stringified JSON stream, select certain arrays and/or objects emit a nested stream for each of them emitting their values/elements. `selector` needs to be a [JSON path selector](#json-path-selector) that selects one or more objects/values whose values/elements should be streamed. If `multi` is true, no error will be thrown if the input contains zero or more than one JSON values on the root level. For multi streams, `selector` can undefined to select the root values themselves.
+A convenience function to parse a stringified JSON stream, select certain arrays and/or objects emit a nested stream for each of them emitting their values/elements. `selector` needs to be a [JSON path selector](#json-path-selector) that selects one or more objects/values whose values/elements should be streamed. If `multi` is true, no error will be thrown if the input contains zero or more than one JSON documents. For multi streams, `selector` can undefined to select the root values themselves.
 
 Under the hood, creates a transformer chain of a [`JsonParser`](#jsonparser), [`JsonPathDetector`](#jsonpathdetector), [`JsonPathSelector`](#jsonpathselector) and [`JsonPathStreamSplitter`](#jsonpathstreamsplitter), and then pipes each sub stream through [`JsonDeserializer`](#jsondeserializer).
+
+Also see [Consuming multiple nested objects/arrays](#consuming-multiple-nested-objectsarrays) for usage instructions.
 
 #### `parseNestedJsonStreamWithPaths`
 
@@ -366,13 +424,15 @@ Under the hood, creates a transformer chain of a [`JsonParser`](#jsonparser), [`
 
 Like [`parseNestedJsonStream`](#parsenestedjsonstream), but the nested streams emit `{ value: JsonValue; path: Array<string | number> }` instead, where `path` is the path of object property keys and array element indexes of each value. In the sub streams, the paths have the path prefix of their containing streamed object/array removed.
 
+Also see [Consuming multiple nested objects/arrays](#consuming-multiple-nested-objectsarrays) for usage instructions.
+
 ### Stream transformers
 
 #### `JsonParser`
 
 A `TransformStream<string, JsonChunk>` that parses the incoming stringified JSON stream and emits [`JsonChunk` objects](#jsonchunk-objects) for the different tokens that the JSON document is made of.
 
-Construct one using `new JsonParser(options?: { multi?: boolean })` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<string>`. If `multi` is true, accepts zero or multiple JSON values on the root level, otherwise an exception is thrown if the data contains zero or more than one values.
+Construct one using `new JsonParser(options?: { multi?: boolean })` and use it by calling [`.pipeThrough()`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) on a `ReadableStream<string>`. If `multi` is true, accepts zero or multiple JSON documents, otherwise an exception is thrown if the data contains zero or more than one documents.
 
 Pass the output on to [`JsonPathDetector`](#jsonpathdetector), [`JsonPathSelector`](#jsonpathselector) and [`JsonDeserializer`](#jsondeserializer) to consume a JSON stream.
 
@@ -412,13 +472,13 @@ For your convenience, `deserializeJsonValue` pipes your stream to a `JsonDeseria
 
 A `TransformStream<SerializableJsonValue, JsonChunk>` that emits the `JsonChunk` objects for each of the JSON values that are piped into it. The reverse of [`JsonDeserializer`](#jsondeserializer).
 
-Construct it using `new JsonSerializer(space?: string | number)`. It is often [piped through](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) [`JsonStringifier`](#jsonstringifier) to generate a stringified JSON stream.
+Construct it using `new JsonSerializer(space?: string | number, options?: { beforeFirst?: string; delimiter?: string; afterLast?: string })`. It is often [piped through](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/pipeThrough) [`JsonStringifier`](#jsonstringifier) to generate a stringified JSON stream.
 
 The `SerializableJsonValue` input chunks can be any valid JSON values, that is `Record<string, JsonValue> | Array<JsonValue> | string | number | boolean | null`. In addition, for async support, any value anywhere in the JSON document can also be a `Promise<JsonValue>` or a `() => (JsonValue | Promise<JsonValue>)` callback instead. For streaming support, any object in the JSON document can be an object stream created by `objectStream()`, any array can be an array stream created by `arrayStream()` and any string (including property keys) can be a string stream created by `stringStream()` (for these, see [stream generators](#stream-generators)). Callbacks or promises returning these streams are also supported.
 
 As the `space` constructor argument, you can specify a number of indentation spaces or an indentation string, equivalent to the [space](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#space) parameter of `JSON.stringify()`. This will cause `WHITESPACE` chunks to be emitted in the appropriate places.
 
-Multiple JSON values on the root level are always separated by a newline (`\n`). This means that when no `space` is defined, the output produced by `JsonSerializer` piped through `JsonStringifier` fulfills the [JSON Lines](https://jsonlines.org/) (JSONL) standard.
+In the `options` parameter, you can define whitespace characters that will be emitted as `WHITESPACE` chunks before, between and after JSON documents. `delimiter` defaults to `\n`, the others to empty strings. This allows generating streams of multiple JSON documents, as defined in the [JSONL](https://jsonlines.org/) (`{ delimiter: "\n" }`, which is the default) or [JSON-seq](https://www.rfc-editor.org/rfc/rfc7464.html) (`{ beforeFist: "\x1e", delimiter: "\n\x1e", afterLast: "\n" }`) standards.
 
 ##### Differences to `JSON.stringify()`
 
@@ -489,7 +549,7 @@ Expects an array of JSON values with paths as emitted by [`JsonPathDetector`](#j
 
 `JsonPathSelector` can be constructed using `new JsonPathSelector(selector: JsonPathSelectorExpression)`. It expects a [JSON path selector](#json-path-selector) expression. All chunks selected by the selector and their descendents are passed through. Notably, this behaviour is different than in the convenience functions such as [`parseJsonStream`](#parsejsonstream), where only the children of the selected objects/arrays would be passed through. If you want to select only the children of an object/array with `JsonPathSelector`, you have to use a `[...path, undefined]` selector.
 
-The `JsonChunk` stream emitted by `JsonPathSelector` is different from other `JsonChunk` streams in the fact that it may emit multiple JSON values on the root level. Typically, the stream is piped through [`JsonDeserializer`](#jsondeserializer) to convert it into actual JavaScript values.
+Typically, the stream is piped through [`JsonDeserializer`](#jsondeserializer) to convert it into actual JavaScript values.
 
 #### `JsonPathStreamSplitter`
 

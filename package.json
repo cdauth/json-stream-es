@@ -1,7 +1,7 @@
 {
 	"name": "json-stream-es",
-	"description": "A streaming JSON/JSONL parser/stringifier using web streams.",
-	"keywords": ["json", "jsonl", "stream", "webstreams"],
+	"description": "A streaming JSON parser/stringifier using web streams.",
+	"keywords": ["json", "jsonl", "json-seq", "streams", "web-streams", "whatwg-streams"],
 	"version": "1.1.0",
 	"author": "Candid Dauth <cdauth@cdauth.eu>",
 	"repository": {

@@ -124,6 +124,8 @@ const STRING_ESCAPE_CHARS = {
 
 /** Whitespace characters allowed between tokens. */
 const WHITESPACE_CHARS = [" ", "\t", "\n", "\r"];
+/** Record separator char that is ignored between JSON documents in multi mode. */
+const RS_CHARS = ["\x1e"];
 const NUMBER_CHARS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 const HEX_NUMBER_CHARS = [...NUMBER_CHARS, "a", "b", "c", "d", "e", "f", "A", "B", "C", "D", "E", "F"];
 
@@ -449,7 +451,7 @@ export class JsonParser extends AbstractTransformStream<string, JsonChunk> {
 
 		// Whitespaces
 
-		if (WHITESPACE_CHARS.includes(char)) {
+		if (WHITESPACE_CHARS.includes(char) || (this.options.multi && isState(this.state, [StateType.START, StateType.END]) && RS_CHARS.includes(char))) {
 			if (this.state.type === StateType.WHITESPACE) {
 				this.state.rawValue += char;
 				return;

@@ -159,26 +159,46 @@ async function* serializeJson(value: SerializableJsonValue, space?: string | num
 	}
 }
 
+export type JsonSerializerOptions = {
+	/** White space characters to insert before the first emitted root value. Not emitted if no values are emitted. */
+	beforeFirst?: string;
+	/** White space characters to insert before each but the first emitted root value. Defaults to a newline (\n). */
+	delimiter?: string;
+	/** White space characters to insert after the last emitted root value. Not emitted if no values are emitted. */
+	afterLast?: string;
+};
+
 /**
  * Converts any JSON-stringifiable JavaScript values into a stream of JsonChunks.
  */
 export class JsonSerializer extends AbstractTransformStream<SerializableJsonValue, JsonChunk> {
 	protected first = true;
 
-	constructor(protected space?: string | number) {
+	constructor(protected space?: string | number, protected options?: JsonSerializerOptions) {
 		super();
 	}
 
 	override async transform(value: SerializableJsonValue, controller: TransformStreamDefaultController<JsonChunk>): Promise<void> {
 		if (this.first) {
+			if (this.options?.beforeFirst) {
+				controller.enqueue(whitespace(this.options.beforeFirst));
+			}
 			this.first = false;
-		} else {
-			controller.enqueue(whitespace("\n"));
+		} else if (this.options?.delimiter !== "") {
+			controller.enqueue(whitespace(this.options?.delimiter ?? "\n"));
 		}
 
 		for await (const chunk of serializeJson(value, this.space)) {
 			controller.enqueue(chunk);
 		}
+	}
+
+	protected override flush(controller: TransformStreamDefaultController<JsonChunk>): void | Promise<void> {
+		if (!this.first && this.options?.afterLast) {
+			controller.enqueue(whitespace(this.options.afterLast));
+		}
+
+		controller.terminate();
 	}
 }
 /**
