@@ -56,6 +56,8 @@ When consuming a web service from the frontend, streaming JSON has the advantage
 
 json-stream-es is available through [NPM](https://www.npmjs.com/package/json-stream-es). Install it using `npm install -S json-stream-es` or `yarn add json-stream-es`.
 
+It is also available on [JSR](https://jsr.io/@cdauth/json-stream-es) and can be installed using `jsr add @cdauth/json-stream-es`. When using it through JSR, you need to import `@cdauth/json-stream-es` instead of `json-stream-es` in all the examples below.
+
 json-stream-es relies on the [Streams API](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) being available as global objects. When used in the backend, it thus requires Node.js >= 18 or a polyfill. In browsers, this API has been widely available since June 2022. If you need to support older browsers, a polyfill is required.
 
 json-stream-es is published as an ECMAScript module. If you want to use it in a Node.js project that still uses CommonJS, you need to use [dynamic `import()`](https://nodejs.org/api/esm.html#import-statements) to import the library; `require()` is not supported.
