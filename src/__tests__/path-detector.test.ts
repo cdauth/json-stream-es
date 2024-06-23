@@ -47,3 +47,53 @@ test("PathDetector adds path", async () => {
 		{ ...objectEnd(), path: [] }
 	]);
 });
+
+test("PathDetector handles empty object", async () => {
+	const stream = serializeJsonValue({
+		outer: {
+			inner: {}
+		}
+	}).pipeThrough(new JsonPathDetector());
+
+	expect(await streamToArray(stream)).toEqual([
+		{ ...objectStart(), path: [] },
+		{ ...stringStart(StringRole.KEY), path: [] },
+		{ ...stringChunk("outer", StringRole.KEY), path: [] },
+		{ ...stringEnd(StringRole.KEY), path: [] },
+		{ ...colon(), path: [] },
+		{ ...objectStart(), path: ["outer"] },
+		{ ...stringStart(StringRole.KEY), path: ["outer"] },
+		{ ...stringChunk("inner", StringRole.KEY), path: ["outer"] },
+		{ ...stringEnd(StringRole.KEY), path: ["outer"] },
+		{ ...colon(), path: ["outer"] },
+		{ ...objectStart(), path: ["outer", "inner"] },
+		{ ...objectEnd(), path: ["outer", "inner"] },
+		{ ...objectEnd(), path: ["outer"] },
+		{ ...objectEnd(), path: [] }
+	]);
+});
+
+test("PathDetector handles empty array", async () => {
+	const stream = serializeJsonValue({
+		outer: {
+			inner: []
+		}
+	}).pipeThrough(new JsonPathDetector());
+
+	expect(await streamToArray(stream)).toEqual([
+		{ ...objectStart(), path: [] },
+		{ ...stringStart(StringRole.KEY), path: [] },
+		{ ...stringChunk("outer", StringRole.KEY), path: [] },
+		{ ...stringEnd(StringRole.KEY), path: [] },
+		{ ...colon(), path: [] },
+		{ ...objectStart(), path: ["outer"] },
+		{ ...stringStart(StringRole.KEY), path: ["outer"] },
+		{ ...stringChunk("inner", StringRole.KEY), path: ["outer"] },
+		{ ...stringEnd(StringRole.KEY), path: ["outer"] },
+		{ ...colon(), path: ["outer"] },
+		{ ...arrayStart(), path: ["outer", "inner"] },
+		{ ...arrayEnd(), path: ["outer", "inner"] },
+		{ ...objectEnd(), path: ["outer"] },
+		{ ...objectEnd(), path: [] }
+	]);
+});
