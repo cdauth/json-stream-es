@@ -52,8 +52,9 @@ export class JsonPathDetector extends AbstractTransformStream<JsonChunk, JsonChu
 		} else if (chunk.type === JsonChunkType.ARRAY_START) {
 			this.stack.push({ type: "array", state: "next", key: 0 });
 		} else if (chunk.type === JsonChunkType.OBJECT_END || chunk.type === JsonChunkType.ARRAY_END) {
-			this.stack.pop();
-			this.path.pop();
+			if (this.stack.pop()?.state !== "pending") {
+				this.path.pop();
+			}
 		} else {
 			const current = this.stack[this.stack.length - 1];
 			if (current?.type === "object") {
