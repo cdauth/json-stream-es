@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { streamToArray, streamToString, stringToStream } from "../utils";
-import { JsonParser } from "../json-parser";
-import { JsonDeserializer } from "../json-deserializer";
-import { serializeJsonValue } from "../json-serializer";
-import { JsonStringifier } from "../json-stringifier";
+import { streamToArray, streamToString, stringToStream } from "../utils.ts";
+import { JsonParser } from "../json-parser.ts";
+import { JsonDeserializer } from "../json-deserializer.ts";
+import { serializeJsonValue } from "../json-serializer.ts";
+import { JsonStringifier } from "../json-stringifier.ts";
 
 const testJsonObjects = [
 	{

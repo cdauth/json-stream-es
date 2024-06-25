@@ -1,5 +1,5 @@
-import type { JsonChunkWithPath, JsonPath } from "./json-path-detector";
-import { AbstractTransformStream, arrayStartsWith } from "./utils";
+import type { JsonChunkWithPath, JsonPath } from "./json-path-detector.ts";
+import { AbstractTransformStream, arrayStartsWith } from "./utils.ts";
 
 /**
  * A selector that can be set for a PathSelector stream.

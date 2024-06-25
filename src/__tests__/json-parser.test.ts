@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { JsonParser } from "../json-parser";
-import { JsonChunkType, StringRole, colon, comma, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace } from "../types";
-import { streamToArray } from "../utils";
+import { JsonParser } from "../json-parser.ts";
+import { JsonChunkType, StringRole, colon, comma, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace } from "../types.ts";
+import { streamToArray } from "../utils.ts";
 
 test("empty object", async () => {
 	const transform = new TransformStream<string, string>();

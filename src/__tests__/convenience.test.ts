@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import { stringifyJsonStream, parseJsonStream, parseNestedJsonStream, parseNestedJsonStreamWithPaths, parseJsonStreamWithPaths } from "../convenience";
-import { arrayStream, objectStream } from "../json-serializer";
-import { streamToArray, streamToIterable, streamToString, stringToStream } from "../utils";
-import type { JsonPath } from "../json-path-detector";
+import { stringifyJsonStream, parseJsonStream, parseNestedJsonStream, parseNestedJsonStreamWithPaths, parseJsonStreamWithPaths } from "../convenience.ts";
+import { arrayStream, objectStream } from "../json-serializer.ts";
+import { streamToArray, streamToIterable, streamToString, stringToStream } from "../utils.ts";
+import type { JsonPath } from "../json-path-detector.ts";
 
 const testObject = {
 	apples: {

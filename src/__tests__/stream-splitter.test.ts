@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { iterableToStream, streamToArray, streamToIterable } from "../utils";
-import { StreamSplitter } from "../stream-splitter";
+import { iterableToStream, streamToArray, streamToIterable } from "../utils.ts";
+import { StreamSplitter } from "../stream-splitter.ts";
 
 type TestStreamChunk = { type: string; value: string };
 

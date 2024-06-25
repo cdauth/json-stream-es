@@ -1,10 +1,10 @@
 import { expect, test } from "vitest";
-import { iterableToStream, streamToIterable, streamToString } from "../utils";
-import { JsonParser } from "../json-parser";
-import { JsonPathDetector, type JsonPath } from "../json-path-detector";
-import { JsonPathSelector } from "../json-path-selector";
-import { JsonPathStreamSplitter } from "../json-path-stream-splitter";
-import { JsonStringifier } from "../json-stringifier";
+import { iterableToStream, streamToIterable, streamToString } from "../utils.ts";
+import { JsonParser } from "../json-parser.ts";
+import { JsonPathDetector, type JsonPath } from "../json-path-detector.ts";
+import { JsonPathSelector } from "../json-path-selector.ts";
+import { JsonPathStreamSplitter } from "../json-path-stream-splitter.ts";
+import { JsonStringifier } from "../json-stringifier.ts";
 
 const testStream = [
 	`{"apples":{"results":[`,

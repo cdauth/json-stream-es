@@ -1,12 +1,13 @@
 {
 	"compilerOptions": {
 		"target": "esnext",
-		"module": "esnext",
+		"module": "nodenext",
 		"esModuleInterop": true,
 		"strict": true,
-		"moduleResolution": "bundler",
+		"moduleResolution": "nodenext",
 		"skipLibCheck": true,
 		"verbatimModuleSyntax": true,
-		"resolveJsonModule": true
+		"resolveJsonModule": true,
+		"allowImportingTsExtensions": true
 	}
 }

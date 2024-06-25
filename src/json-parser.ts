@@ -1,5 +1,5 @@
-import { StringRole, arrayEnd, arrayStart, booleanValue, colon, comma, nullValue, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace, type JsonChunk } from "./types";
-import { AbstractTransformStream } from "./utils";
+import { StringRole, arrayEnd, arrayStart, booleanValue, colon, comma, nullValue, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace, type JsonChunk } from "./types.ts";
+import { AbstractTransformStream } from "./utils.ts";
 
 enum StateType {
 	START = "start",

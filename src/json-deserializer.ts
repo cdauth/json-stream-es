@@ -1,6 +1,6 @@
-import type { JsonChunkWithPath, JsonPath } from "./json-path-detector";
-import { JsonChunkType, StringRole, type JsonChunk, type JsonValue } from "./types";
-import { AbstractTransformStream } from "./utils";
+import type { JsonChunkWithPath, JsonPath } from "./json-path-detector.ts";
+import { JsonChunkType, StringRole, type JsonChunk, type JsonValue } from "./types.ts";
+import { AbstractTransformStream } from "./utils.ts";
 
 enum StateType {
 	ROOT = "ROOT",

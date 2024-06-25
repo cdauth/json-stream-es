@@ -1,6 +1,6 @@
-import { JsonParser } from "./json-parser";
-import { StringRole, arrayEnd, arrayStart, booleanValue, colon, comma, nullValue, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace, type JsonChunk } from "./types";
-import { AbstractTransformStream, iterableToStream, streamToIterable, stringToStream } from "./utils";
+import { JsonParser } from "./json-parser.ts";
+import { StringRole, arrayEnd, arrayStart, booleanValue, colon, comma, nullValue, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart, whitespace, type JsonChunk } from "./types.ts";
+import { AbstractTransformStream, iterableToStream, streamToIterable, stringToStream } from "./utils.ts";
 
 type AnyIterable<T> = Iterable<T> | AsyncIterable<T> | ReadableStream<T>;
 
@@ -41,6 +41,15 @@ export function isArrayStream(value: any): value is ArrayStream<any> {
 
 
 type SyncOrAsync<T> = T | Promise<T> | (() => T | Promise<T>);
+/**
+ * Represents a value that can be serialized into JSON, with additional support for async or streamed values.
+ *
+ * The value and any of its nested object property keys and values and array elements can be a regular
+ * {@linkcode ./types.js#JsonValue|JsonValue}, an object stream as returned by {@linkcode objectStream}, an array
+ * stream as returned by {@linkcode arrayStream}, or a string string stream as returned by {@linkcode stringStream}.
+ * Alternatively, any value can be a promise that resolves to any of the supported values or a sync or async
+ * function that returns any of the supported values.
+ */
 export type SerializableJsonValue = SyncOrAsync<
 	| { [key: string | number]: SerializableJsonValue }
 	| (ReadableStream<[key: string | StringStream, value: SerializableJsonValue]> & { [objectStreamSymbol]: true }) // Cannot use ObjectStream<StreamedJsonValue> due to circular reference

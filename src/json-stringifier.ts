@@ -1,5 +1,5 @@
-import type { JsonChunk } from "./types";
-import { AbstractTransformStream } from "./utils";
+import type { JsonChunk } from "./types.ts";
+import { AbstractTransformStream } from "./utils.ts";
 
 /**
  * Converts a stream of JsonChunks into a JSON string stream.

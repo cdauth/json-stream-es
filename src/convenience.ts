@@ -1,13 +1,18 @@
-import { JsonDeserializer, type JsonValueAndPath } from "./json-deserializer";
-import { JsonParser, type JsonParserOptions } from "./json-parser";
-import { JsonSerializer, serializeJsonValue, type JsonSerializerOptions, type SerializableJsonValue } from "./json-serializer";
-import { JsonStringifier } from "./json-stringifier";
-import { JsonPathDetector, type JsonPath } from "./json-path-detector";
-import { JsonPathSelector, matchesJsonPathSelector, type JsonPathSelectorExpression } from "./json-path-selector";
-import { JsonPathStreamSplitter } from "./json-path-stream-splitter";
-import type { JsonValue } from "./types";
-import { AbstractTransformStream, PipeableTransformStream } from "./utils";
+import { JsonDeserializer, type JsonValueAndPath } from "./json-deserializer.ts";
+import { JsonParser, type JsonParserOptions } from "./json-parser.ts";
+import { JsonSerializer, serializeJsonValue, type JsonSerializerOptions, type SerializableJsonValue } from "./json-serializer.ts";
+import { JsonStringifier } from "./json-stringifier.ts";
+import { JsonPathDetector, type JsonPath } from "./json-path-detector.ts";
+import { JsonPathSelector, matchesJsonPathSelector, type JsonPathSelectorExpression } from "./json-path-selector.ts";
+import { JsonPathStreamSplitter } from "./json-path-stream-splitter.ts";
+import type { JsonValue } from "./types.ts";
+import { AbstractTransformStream, PipeableTransformStream } from "./utils.ts";
 
+/**
+ * Converts a single JSON document into a stringified JSON stream. Streamed JSON values are supported anywhere in the JSON document,
+ * see {@link SerializableJsonValue} for more details.
+ * @param space If specified, the resulting JSON will be prettified. Specify an indentation string or a number of indentation spaces.
+ */
 export function stringifyJsonStream(value: SerializableJsonValue, space?: string | number): ReadableStream<string> {
 	return serializeJsonValue(value, space).pipeThrough(new JsonStringifier());
 }

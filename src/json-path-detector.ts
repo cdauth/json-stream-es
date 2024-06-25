@@ -1,5 +1,5 @@
-import { JsonChunkType, StringRole, type JsonChunk } from "./types";
-import { AbstractTransformStream } from "./utils";
+import { JsonChunkType, StringRole, type JsonChunk } from "./types.ts";
+import { AbstractTransformStream } from "./utils.ts";
 
 /**
  * An array that describes the chain of object and array keys that the current value is located under.

@@ -1,9 +1,9 @@
 import { expect, test } from "vitest";
-import { streamToArray } from "../utils";
-import { JsonPathSelector, matchesJsonPathSelector, type JsonPathSelectorExpression } from "../json-path-selector";
-import { serializeJsonValue } from "../json-serializer";
-import { JsonDeserializer } from "../json-deserializer";
-import { JsonPathDetector } from "../json-path-detector";
+import { streamToArray } from "../utils.ts";
+import { JsonPathSelector, matchesJsonPathSelector, type JsonPathSelectorExpression } from "../json-path-selector.ts";
+import { serializeJsonValue } from "../json-serializer.ts";
+import { JsonDeserializer } from "../json-deserializer.ts";
+import { JsonPathDetector } from "../json-path-detector.ts";
 
 test("matchesPathSelector", () => {
 	expect(matchesJsonPathSelector([], [])).toBe(true);

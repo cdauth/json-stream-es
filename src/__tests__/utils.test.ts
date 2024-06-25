@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { AbortHandlingTransformStream } from "../utils";
+import { AbortHandlingTransformStream } from "../utils.ts";
 
 describe("AbortHandlingTransformStream", () => {
 

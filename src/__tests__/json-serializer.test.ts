@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { arrayStream, objectStream, serializeJsonValue, stringStream } from "../json-serializer";
-import { JsonStringifier } from "../json-stringifier";
-import { streamToString } from "../utils";
+import { arrayStream, objectStream, serializeJsonValue, stringStream } from "../json-serializer.ts";
+import { JsonStringifier } from "../json-stringifier.ts";
+import { streamToString } from "../utils.ts";
 
 test.each([
 	{ space: undefined, desc: "undefined" },

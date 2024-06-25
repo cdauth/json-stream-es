@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import { streamToArray } from "../utils";
-import { StringRole, arrayEnd, arrayStart, colon, comma, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart } from "../types";
-import { serializeJsonValue } from "../json-serializer";
-import { JsonPathDetector } from "../json-path-detector";
+import { streamToArray } from "../utils.ts";
+import { StringRole, arrayEnd, arrayStart, colon, comma, numberValue, objectEnd, objectStart, stringChunk, stringEnd, stringStart } from "../types.ts";
+import { serializeJsonValue } from "../json-serializer.ts";
+import { JsonPathDetector } from "../json-path-detector.ts";
 
 test("PathDetector adds path", async () => {
 	const stream = serializeJsonValue({

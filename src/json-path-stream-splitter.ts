@@ -1,6 +1,6 @@
-import type { JsonChunkWithPath, JsonPath } from "./json-path-detector";
-import { StreamSplitter } from "./stream-splitter";
-import { arrayStartsWith } from "./utils";
+import type { JsonChunkWithPath, JsonPath } from "./json-path-detector.ts";
+import { StreamSplitter } from "./stream-splitter.ts";
+import { arrayStartsWith } from "./utils.ts";
 
 type P = {
 	path: JsonPath;
